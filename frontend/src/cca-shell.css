@@ -629,3 +629,36 @@ button.ghost {
   border-color: var(--accent-2);
   color: var(--accent-2);
 }
+
+.inbound-form,
+.add-staff-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+}
+
+.inbound-form label,
+.add-staff-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inbound-form input,
+.inbound-form textarea,
+.add-staff-form input,
+.add-staff-form select {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+}

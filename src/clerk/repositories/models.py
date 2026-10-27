@@ -79,6 +79,20 @@ class MfaRecoveryCodeRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class InboundMessageRow(Base):
+    __tablename__ = "inbound_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    from_name: Mapped[str] = mapped_column(String(128))
+    from_email: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(512))
+    body: Mapped[str] = mapped_column(Text)
+    channel: Mapped[str] = mapped_column(String(32), default="Email")
+    sample_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class TaskRow(Base):
     __tablename__ = "tasks"
 
@@ -86,6 +100,9 @@ class TaskRow(Base):
     status: Mapped[str] = mapped_column(String(32), index=True)
     kind: Mapped[str] = mapped_column(String(32))
     inbound_text: Mapped[str] = mapped_column(Text)
+    inbound_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    inbound_subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    reply_to_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     draft_subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
     draft_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     cited_pages_json: Mapped[str] = mapped_column(Text, default="[]")
@@ -105,6 +122,9 @@ class OutboxRow(Base):
     kind: Mapped[str] = mapped_column(String(32))
     subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
     body: Mapped[str] = mapped_column(Text)
+    to_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    delivered: Mapped[bool] = mapped_column(default=False)
+    delivery_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     source_task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

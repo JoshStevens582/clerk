@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from clerk.repositories.task_repo import TaskRepository
 from clerk.schemas.api import HealthOut, LiveOut, ReadyOut
+from clerk.services.outbound_delivery import smtp_configured
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -40,6 +41,7 @@ async def health(request: Request) -> HealthOut:
         pending = TaskRepository(session).pending_count()
     return HealthOut(
         openai_configured=settings.openai_configured,
+        smtp_configured=smtp_configured(settings),
         pages_dir=settings.pages_dir,
         pending_count=pending,
     )

@@ -1,11 +1,21 @@
-import type { HealthStatus, MessageResult, OutboxItem, QueueItem, StaffUser } from "../api";
-import { INBOX, type InboxMessage } from "../inbox";
+import { useState } from "react";
+
+import {
+  createInboundMessage,
+  type HealthStatus,
+  type InboxMessage,
+  type MessageResult,
+  type OutboxItem,
+  type QueueItem,
+  type StaffUser,
+} from "../api";
 import { kindLabel } from "../labels";
 
 type ClerkWorkspaceProps = {
   user: StaffUser;
   mfaEnabled: boolean;
   health: HealthStatus | null;
+  inbox: InboxMessage[];
   queue: QueueItem[];
   outbox: OutboxItem[];
   selected: InboxMessage | null;
@@ -19,12 +29,14 @@ type ClerkWorkspaceProps = {
   onOpenSecurity: () => void;
   onOpenPeople?: () => void;
   onLogout: () => void;
+  onInboxChanged: () => void;
 };
 
 export function ClerkWorkspace({
   user,
   mfaEnabled,
   health,
+  inbox,
   queue,
   outbox,
   selected,
@@ -38,8 +50,31 @@ export function ClerkWorkspace({
   onOpenSecurity,
   onOpenPeople,
   onLogout,
+  onInboxChanged,
 }: ClerkWorkspaceProps) {
   const pending = queue.length;
+  const [showAddInbound, setShowAddInbound] = useState(false);
+  const [inboundForm, setInboundForm] = useState({
+    from_name: "",
+    from_email: "",
+    subject: "",
+    body: "",
+    channel: "Email",
+  });
+  const [inboundError, setInboundError] = useState<string | null>(null);
+
+  async function onSubmitInbound(event: React.FormEvent) {
+    event.preventDefault();
+    setInboundError(null);
+    try {
+      await createInboundMessage(inboundForm);
+      setInboundForm({ from_name: "", from_email: "", subject: "", body: "", channel: "Email" });
+      setShowAddInbound(false);
+      onInboxChanged();
+    } catch (err) {
+      setInboundError(err instanceof Error ? err.message : "Could not add message.");
+    }
+  }
 
   return (
     <div className="app">
@@ -63,33 +98,93 @@ export function ClerkWorkspace({
                 ? "OpenAI ready"
                 : "OpenAI not set"}
           </span>
+          <span className={`pill ${health === null ? "" : health.smtp_configured ? "ok" : "warn"}`}>
+            {health === null
+              ? "Mail…"
+              : health.smtp_configured
+                ? "SMTP ready"
+                : "SMTP not set"}
+          </span>
           <span className={`pill ${pending > 0 ? "warn" : "ok"}`}>
             {pending} awaiting approval
           </span>
         </div>
         <p className="section-label">Inbox</p>
+        <button
+          type="button"
+          className="new-chat"
+          onClick={() => setShowAddInbound((open) => !open)}
+        >
+          {showAddInbound ? "Cancel" : "Add inbound message"}
+        </button>
+        {showAddInbound ? (
+          <form className="inbound-form" onSubmit={(e) => void onSubmitInbound(e)}>
+            {inboundError ? <p className="error">{inboundError}</p> : null}
+            <label>
+              From name
+              <input
+                required
+                value={inboundForm.from_name}
+                onChange={(e) => setInboundForm({ ...inboundForm, from_name: e.target.value })}
+              />
+            </label>
+            <label>
+              From email
+              <input
+                required
+                type="email"
+                value={inboundForm.from_email}
+                onChange={(e) => setInboundForm({ ...inboundForm, from_email: e.target.value })}
+              />
+            </label>
+            <label>
+              Subject
+              <input
+                required
+                value={inboundForm.subject}
+                onChange={(e) => setInboundForm({ ...inboundForm, subject: e.target.value })}
+              />
+            </label>
+            <label>
+              Message
+              <textarea
+                required
+                rows={4}
+                value={inboundForm.body}
+                onChange={(e) => setInboundForm({ ...inboundForm, body: e.target.value })}
+              />
+            </label>
+            <button type="submit" className="send" disabled={busy}>
+              Save to inbox
+            </button>
+          </form>
+        ) : null}
         <div className="stack">
-          {INBOX.map((message) => {
-            const isActive = selected?.id === message.id;
-            const handled = processedIds.has(message.id);
-            return (
-              <button
-                key={message.id}
-                type="button"
-                className={`row ${isActive ? "active" : ""}`}
-                disabled={busy}
-                onClick={() => onSelectInbox(message)}
-              >
-                <span>
-                  {message.subject}
-                  <small>
-                    {message.from} · {message.receivedLabel}
-                    {handled ? " · Handled" : ""}
-                  </small>
-                </span>
-              </button>
-            );
-          })}
+          {inbox.length === 0 ? (
+            <p className="muted-copy">No open messages. Add one or use the webhook.</p>
+          ) : (
+            inbox.map((message) => {
+              const isActive = selected?.id === message.id;
+              const handled = processedIds.has(String(message.id));
+              return (
+                <button
+                  key={message.id}
+                  type="button"
+                  className={`row ${isActive ? "active" : ""}`}
+                  disabled={busy}
+                  onClick={() => onSelectInbox(message)}
+                >
+                  <span>
+                    {message.subject}
+                    <small>
+                      {message.from} · {message.receivedLabel}
+                      {handled ? " · Handled" : ""}
+                    </small>
+                  </span>
+                </button>
+              );
+            })
+          )}
         </div>
         {onOpenPeople ? (
           <button type="button" className="new-chat" onClick={onOpenPeople}>
@@ -228,8 +323,14 @@ export function ClerkWorkspace({
                   <strong>{kindLabel(item.kind)}</strong>
                   <span className="score">{new Date(item.sent_at).toLocaleString()}</span>
                 </header>
+                {item.to_email ? <p className="out-subject">To: {item.to_email}</p> : null}
                 {item.subject ? <p className="out-subject">{item.subject}</p> : null}
                 <p>{item.body}</p>
+                {item.delivered ? (
+                  <p className="pill ok">Delivered via SMTP</p>
+                ) : item.delivery_error ? (
+                  <p className="muted-copy">{item.delivery_error}</p>
+                ) : null}
               </div>
             ))}
           </div>

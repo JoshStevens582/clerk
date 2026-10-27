@@ -52,6 +52,32 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             with engine.begin() as connection:
                 for statement in alters:
                     connection.execute(text(statement))
+    if "tasks" in table_names:
+        task_columns = {column["name"] for column in inspector.get_columns("tasks")}
+        task_alters: list[str] = []
+        if "inbound_message_id" not in task_columns:
+            task_alters.append("ALTER TABLE tasks ADD COLUMN inbound_message_id INTEGER")
+        if "inbound_subject" not in task_columns:
+            task_alters.append("ALTER TABLE tasks ADD COLUMN inbound_subject VARCHAR(512)")
+        if "reply_to_email" not in task_columns:
+            task_alters.append("ALTER TABLE tasks ADD COLUMN reply_to_email VARCHAR(320)")
+        if task_alters:
+            with engine.begin() as connection:
+                for statement in task_alters:
+                    connection.execute(text(statement))
+    if "outbox" in table_names:
+        outbox_columns = {column["name"] for column in inspector.get_columns("outbox")}
+        outbox_alters: list[str] = []
+        if "to_email" not in outbox_columns:
+            outbox_alters.append("ALTER TABLE outbox ADD COLUMN to_email VARCHAR(320)")
+        if "delivered" not in outbox_columns:
+            outbox_alters.append("ALTER TABLE outbox ADD COLUMN delivered BOOLEAN DEFAULT 0")
+        if "delivery_error" not in outbox_columns:
+            outbox_alters.append("ALTER TABLE outbox ADD COLUMN delivery_error VARCHAR(512)")
+        if outbox_alters:
+            with engine.begin() as connection:
+                for statement in outbox_alters:
+                    connection.execute(text(statement))
 
 
 def session_factory(engine: Engine) -> sessionmaker[Session]:

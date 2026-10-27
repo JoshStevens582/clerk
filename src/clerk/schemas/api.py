@@ -9,6 +9,29 @@ from clerk.schemas.agent import PolicyOutcomeKind, QueueStatus
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=8000)
     sample_id: str | None = None
+    inbound_id: int | None = None
+    reply_to_email: str | None = Field(default=None, max_length=320)
+    inbound_subject: str | None = Field(default=None, max_length=512)
+
+
+class InboundMessageOut(BaseModel):
+    id: int
+    from_name: str
+    from_email: str
+    subject: str
+    body: str
+    channel: str
+    sample_id: str | None = None
+    handled: bool
+    created_at: datetime
+
+
+class CreateInboundIn(BaseModel):
+    from_name: str = Field(min_length=1, max_length=128)
+    from_email: str = Field(min_length=3, max_length=320)
+    subject: str = Field(min_length=1, max_length=512)
+    body: str = Field(min_length=1, max_length=8000)
+    channel: str = Field(default="Email", max_length=32)
 
 
 class MessageOut(BaseModel):
@@ -37,6 +60,9 @@ class OutboxItemOut(BaseModel):
     kind: str
     subject: str | None
     body: str
+    to_email: str | None = None
+    delivered: bool = False
+    delivery_error: str | None = None
     sent_at: datetime
     source_task_id: int | None
 
@@ -53,5 +79,6 @@ class ReadyOut(BaseModel):
 class HealthOut(BaseModel):
     status: Literal["ok"] = "ok"
     openai_configured: bool
+    smtp_configured: bool
     pages_dir: str
     pending_count: int

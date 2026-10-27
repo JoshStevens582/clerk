@@ -15,6 +15,12 @@ Summary:
 5. Add the Clerk site block to Atlas Caddy and redeploy Atlas `web`.
 6. Open `https://agent.customchatandautomation.co.za` and sign in before using the demo.
 
+## Mail (production)
+
+Copy the same `SMTP_*` values as Atlas into `/opt/clerk/.env` so password reset and **approved / auto-replies** send to the patient email on each inbound message. The desk shows **SMTP ready** when configured.
+
+Optional inbound automation: set `CLERK_INBOUND_WEBHOOK_SECRET` and `POST` JSON to `/api/hooks/inbound` with header `X-Clerk-Inbound-Secret`. Staff can also use **Add inbound message** in the UI.
+
 ## Local Docker smoke test
 
 ```bash

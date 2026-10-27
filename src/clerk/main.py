@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from clerk.api.routers.auth import router as auth_router
 from clerk.api.routers.health import router as health_router
+from clerk.api.routers.hooks import router as hooks_router
+from clerk.api.routers.inbox import router as inbox_router
 from clerk.api.routers.samples import router as samples_router
 from clerk.api.routers.staff import router as staff_router
 from clerk.api.routers.tasks import router as tasks_router
@@ -15,6 +17,7 @@ from clerk.config import load_settings, require_secure_auth_secret
 from clerk.repositories.db import create_db_engine, init_db, session_factory
 from clerk.services.agent import ClerkAgentService
 from clerk.services.auth_rate_limit import AuthRateLimiter
+from clerk.services.inbox_seed import seed_demo_inbox
 from clerk.services.login_lockout import LoginLockout
 from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
@@ -61,6 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.login_lockout = login_lockout
     app.state.redis_client = redis_client
     bootstrap_staff_users(settings, db_factory)
+    seed_demo_inbox(db_factory)
     yield
     if redis_client is not None:
         await redis_client.aclose()
@@ -82,6 +86,8 @@ def create_app() -> FastAPI:
     app.include_router(staff_router)
     app.include_router(samples_router)
     app.include_router(tasks_router)
+    app.include_router(inbox_router)
+    app.include_router(hooks_router)
     return app
 
 

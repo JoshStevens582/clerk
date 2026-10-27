@@ -18,6 +18,9 @@ class TaskRepository:
         proposal_kind: ProposalKind,
         inbound_text: str,
         outcome: PolicyOutcome,
+        reply_to_email: str | None = None,
+        inbound_subject: str | None = None,
+        inbound_message_id: int | None = None,
     ) -> TaskRow:
         status: QueueStatus
         if outcome.kind == PolicyOutcomeKind.SENT_AUTO:
@@ -31,6 +34,9 @@ class TaskRepository:
             status=status,
             kind=proposal_kind.value,
             inbound_text=inbound_text,
+            inbound_message_id=inbound_message_id,
+            inbound_subject=inbound_subject,
+            reply_to_email=reply_to_email.strip().lower() if reply_to_email else None,
             draft_subject=outcome.draft_subject,
             draft_body=outcome.draft_body,
             cited_pages_json=json.dumps(outcome.cited_pages),
@@ -48,6 +54,7 @@ class TaskRepository:
                 subject=None,
                 body=outcome.auto_reply_text,
                 source_task_id=row.id,
+                to_email=row.reply_to_email,
             )
             row.resolved_at = datetime.now(tz=UTC)
         return row
@@ -76,6 +83,7 @@ class TaskRepository:
             subject=row.draft_subject,
             body=row.draft_body or "",
             source_task_id=row.id,
+            to_email=row.reply_to_email,
         )
         return row
 
@@ -103,11 +111,13 @@ class TaskRepository:
         subject: str | None,
         body: str,
         source_task_id: int,
+        to_email: str | None = None,
     ) -> OutboxRow:
         row = OutboxRow(
             kind=kind,
             subject=subject,
             body=body,
+            to_email=to_email.strip().lower() if to_email else None,
             source_task_id=source_task_id,
         )
         self._session.add(row)

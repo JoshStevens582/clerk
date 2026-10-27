@@ -16,8 +16,22 @@ export type OutboxItem = {
   kind: string;
   subject: string | null;
   body: string;
+  to_email: string | null;
+  delivered: boolean;
+  delivery_error: string | null;
   sent_at: string;
   source_task_id: number | null;
+};
+
+export type InboxMessage = {
+  id: number;
+  sampleId: string | null;
+  from: string;
+  fromEmail: string;
+  subject: string;
+  receivedLabel: string;
+  body: string;
+  channel: string;
 };
 
 export type MessageResult = {
@@ -31,8 +45,17 @@ export type MessageResult = {
 export type HealthStatus = {
   status: string;
   openai_configured: boolean;
+  smtp_configured: boolean;
   pages_dir: string;
   pending_count: number;
+};
+
+export type CreateStaffPayload = {
+  username: string;
+  password: string;
+  role: "staff" | "manager";
+  display_name?: string | null;
+  email?: string | null;
 };
 
 export type StaffUser = {
@@ -448,6 +471,85 @@ export async function setStaffUserDisabled(
   });
 }
 
+export async function createStaffUser(payload: CreateStaffPayload): Promise<StaffUser> {
+  return api<StaffUser>("/api/staff/users", {
+    method: "POST",
+    body: JSON.stringify({
+      username: payload.username,
+      password: payload.password,
+      role: payload.role,
+      display_name: payload.display_name ?? null,
+      email: payload.email ?? null,
+    }),
+  });
+}
+
+function formatInboxTime(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function mapInbound(row: {
+  id: number;
+  from_name: string;
+  from_email: string;
+  subject: string;
+  body: string;
+  channel: string;
+  sample_id: string | null;
+  created_at: string;
+}): InboxMessage {
+  return {
+    id: row.id,
+    sampleId: row.sample_id,
+    from: row.from_name,
+    fromEmail: row.from_email,
+    subject: row.subject,
+    body: row.body,
+    channel: row.channel,
+    receivedLabel: formatInboxTime(row.created_at),
+  };
+}
+
+export async function fetchInbox(): Promise<InboxMessage[]> {
+  const rows = await api<
+    {
+      id: number;
+      from_name: string;
+      from_email: string;
+      subject: string;
+      body: string;
+      channel: string;
+      sample_id: string | null;
+      created_at: string;
+    }[]
+  >("/api/inbox");
+  return rows.map(mapInbound);
+}
+
+export async function createInboundMessage(payload: {
+  from_name: string;
+  from_email: string;
+  subject: string;
+  body: string;
+  channel?: string;
+}): Promise<InboxMessage> {
+  const row = await api<{
+    id: number;
+    from_name: string;
+    from_email: string;
+    subject: string;
+    body: string;
+    channel: string;
+    sample_id: string | null;
+    created_at: string;
+  }>("/api/inbox", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return mapInbound(row);
+}
+
 export async function logout(): Promise<void> {
   const refresh = sessionStorage.getItem(REFRESH_KEY);
   if (refresh) {
@@ -470,11 +572,22 @@ export async function fetchHealth(): Promise<HealthStatus> {
 
 export async function submitMessage(
   text: string,
-  sampleId?: string,
+  options?: {
+    sampleId?: string | null;
+    inboundId?: number;
+    replyToEmail?: string;
+    inboundSubject?: string;
+  },
 ): Promise<MessageResult> {
   return api("/api/messages", {
     method: "POST",
-    body: JSON.stringify({ text, sample_id: sampleId ?? null }),
+    body: JSON.stringify({
+      text,
+      sample_id: options?.sampleId ?? null,
+      inbound_id: options?.inboundId ?? null,
+      reply_to_email: options?.replyToEmail ?? null,
+      inbound_subject: options?.inboundSubject ?? null,
+    }),
   });
 }
 

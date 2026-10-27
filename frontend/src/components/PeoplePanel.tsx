@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   clearStaffMfa,
+  createStaffUser,
   fetchStaffUsers,
   setStaffUserDisabled,
   setStaffUserRole,
@@ -18,6 +19,13 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showAddStaff, setShowAddStaff] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    username: "",
+    password: "",
+    role: "staff" as "staff" | "manager",
+    email: "",
+  });
 
   async function refresh() {
     setPeople(await fetchStaffUsers());
@@ -48,8 +56,8 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
       <header className="chat-header">
         <h1>People</h1>
         <p>
-          Managers can promote or demote staff, disable accounts, or clear a locked-out
-          authenticator — same idea as Atlas admin People. Signed in as {signedInUsername}.
+          Add staff accounts, change roles, disable accounts, or clear authenticators.
+          Signed in as {signedInUsername}.
         </p>
         <button type="button" className="ghost" onClick={onBack}>
           Back to desk
@@ -57,6 +65,82 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
       </header>
       {error ? <p className="error banner">{error}</p> : null}
       {notice ? <p className="login-copy">{notice}</p> : null}
+      <button
+        type="button"
+        className="new-chat"
+        onClick={() => setShowAddStaff((open) => !open)}
+      >
+        {showAddStaff ? "Cancel" : "Add staff account"}
+      </button>
+      {showAddStaff ? (
+        <form
+          className="add-staff-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void runAdmin(async () => {
+              const username = newStaff.username.trim().toLowerCase();
+              await createStaffUser({
+                username,
+                password: newStaff.password,
+                role: newStaff.role,
+                email: newStaff.email.trim() || null,
+              });
+              setNewStaff({ username: "", password: "", role: "staff", email: "" });
+              setShowAddStaff(false);
+              setNotice(
+                `Account ${username} created. They sign in here with that password and should change it under Security.`,
+              );
+            });
+          }}
+        >
+          <label>
+            Username (lowercase letters, numbers, - or _)
+            <input
+              required
+              pattern="[a-z0-9_-]+"
+              minLength={2}
+              value={newStaff.username}
+              onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
+            />
+          </label>
+          <label>
+            Temporary password (min 8 characters)
+            <input
+              required
+              type="password"
+              minLength={8}
+              value={newStaff.password}
+              onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+            />
+          </label>
+          <label>
+            Role
+            <select
+              value={newStaff.role}
+              onChange={(e) =>
+                setNewStaff({
+                  ...newStaff,
+                  role: e.target.value as "staff" | "manager",
+                })
+              }
+            >
+              <option value="staff">Staff (desk only)</option>
+              <option value="manager">Manager (People + desk)</option>
+            </select>
+          </label>
+          <label>
+            Email (optional — for password reset)
+            <input
+              type="email"
+              value={newStaff.email}
+              onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+            />
+          </label>
+          <button type="submit" className="send" disabled={busy}>
+            Create account
+          </button>
+        </form>
+      ) : null}
       <div className="people-list">
         {people.map((person) => (
           <article className="people-row" key={person.username}>

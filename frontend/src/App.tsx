@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   approveTask,
   fetchHealth,
+  fetchInbox,
   fetchMe,
   fetchOutbox,
   fetchQueue,
@@ -13,6 +14,7 @@ import {
   startSessionMaintenance,
   submitMessage,
   type HealthStatus,
+  type InboxMessage,
   type MessageResult,
   type OutboxItem,
   type QueueItem,
@@ -21,7 +23,6 @@ import { AuthScreen } from "./components/AuthScreen";
 import { ClerkWorkspace } from "./components/ClerkWorkspace";
 import { PeoplePanel } from "./components/PeoplePanel";
 import { SecurityPanel } from "./components/SecurityPanel";
-import type { InboxMessage } from "./inbox";
 
 export function App() {
   const [user, setUser] = useState<StaffUser | null>(null);
@@ -32,16 +33,23 @@ export function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  const [inbox, setInbox] = useState<InboxMessage[]>([]);
   const [selected, setSelected] = useState<InboxMessage | null>(null);
   const [processedIds, setProcessedIds] = useState<Set<string>>(() => new Set());
   const [lastResult, setLastResult] = useState<MessageResult | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [q, o, h] = await Promise.all([fetchQueue(), fetchOutbox(), fetchHealth()]);
+    const [q, o, h, i] = await Promise.all([
+      fetchQueue(),
+      fetchOutbox(),
+      fetchHealth(),
+      fetchInbox(),
+    ]);
     setQueue(q);
     setOutbox(o);
     setHealth(h);
+    setInbox(i);
   }, []);
 
   async function loadMe() {
@@ -68,6 +76,7 @@ export function App() {
     setPeopleOpen(false);
     setQueue([]);
     setOutbox([]);
+    setInbox([]);
     setLastResult(null);
     setSelected(null);
     setProcessedIds(new Set());
@@ -79,9 +88,14 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      const result = await submitMessage(message.body, message.sampleId);
+      const result = await submitMessage(message.body, {
+        sampleId: message.sampleId,
+        inboundId: message.id,
+        replyToEmail: message.fromEmail,
+        inboundSubject: message.subject,
+      });
       setLastResult(result);
-      setProcessedIds((prev) => new Set(prev).add(message.id));
+      setProcessedIds((prev) => new Set(prev).add(String(message.id)));
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
@@ -177,6 +191,7 @@ export function App() {
       user={user}
       mfaEnabled={mfaEnabled}
       health={health}
+      inbox={inbox}
       queue={queue}
       outbox={outbox}
       selected={selected}
@@ -200,6 +215,7 @@ export function App() {
           : undefined
       }
       onLogout={() => void handleLogout()}
+      onInboxChanged={() => void refresh()}
     />
   );
 }

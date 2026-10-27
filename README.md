@@ -29,7 +29,7 @@ cd frontend && npm install && npm run dev
 
 Open `http://localhost:5175`. **Staff sign-in** uses Atlas-style security: short-lived JWT access tokens, refresh rotation, Redis login rate limits and account lockout, optional authenticator MFA, and bcrypt passwords. Local demo accounts come from `CLERK_BOOTSTRAP_STAFF` in `.env`. Set `CLERK_AUTH_SECRET` to a random string (≥ 32 bytes) before production; start Redis for lockout and auth rate limits (`REDIS_URL`, or `docker compose up`).
 
-Managers can add users: `uv run python -m clerk.staff_cli newname --role staff` or `POST /api/staff/users` while signed in as a manager. Managers should turn on MFA under `/api/auth/mfa/*` after sign-in (UI coming); API matches Atlas.
+Managers add staff under **People** in the desk (or `uv run python -m clerk.staff_cli`, or `POST /api/staff/users`). Inbound mail is stored in `/api/inbox` (staff can **Add inbound message**; external systems can `POST /api/hooks/inbound` with `X-Clerk-Inbound-Secret`). Approvals and auto-replies go out via SMTP when `SMTP_*` is set; otherwise they stay in the outbox with a clear status.
 
 ## Tests and quality
 
