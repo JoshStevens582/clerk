@@ -53,6 +53,10 @@ async def enforce_forgot_password_rate_limit(request: Request) -> None:
     await _enforce_bucket(request, subject=_client_ip(request), bucket="forgot_password")
 
 
+async def enforce_demo_rate_limit(request: Request) -> None:
+    await _enforce_bucket(request, subject=_client_ip(request), bucket="demo")
+
+
 async def _enforce_bucket(request: Request, *, subject: str, bucket: str) -> None:
     settings = request.app.state.settings
     if not settings.rate_limit_enabled:
@@ -183,3 +187,4 @@ async def clear_login_lockout(request: Request, username: str) -> None:
 LoginRateLimitDep = Annotated[None, Depends(enforce_login_rate_limit)]
 RefreshRateLimitDep = Annotated[None, Depends(enforce_refresh_rate_limit)]
 ForgotPasswordRateLimitDep = Annotated[None, Depends(enforce_forgot_password_rate_limit)]
+DemoRateLimitDep = Annotated[None, Depends(enforce_demo_rate_limit)]

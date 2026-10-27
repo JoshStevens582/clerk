@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 
 import {
   completeMfaLogin,
+  fetchDemoStatus,
   forgotPassword,
   login,
+  loginDemo,
   resetPassword,
   type StaffUser,
 } from "../api";
@@ -16,7 +18,7 @@ type AuthScreenProps = {
 
 export function AuthScreen({ onSignedIn }: AuthScreenProps) {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [username, setUsername] = useState("owner");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [mfaToken, setMfaToken] = useState("");
@@ -24,6 +26,13 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps) {
   const [forgotNotice, setForgotNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [demoAvailable, setDemoAvailable] = useState(false);
+
+  useEffect(() => {
+    void fetchDemoStatus()
+      .then(setDemoAvailable)
+      .catch(() => setDemoAvailable(false));
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -94,8 +103,8 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps) {
         </div>
         {authMode === "login" ? (
           <p className="login-copy">
-            Desk for Cape Town Physio: patient mail is processed automatically; you approve
-            bookings and outbound emails.
+            Try the live demo with one click, or sign in with the staff account your clinic was
+            given. Demo visitors only see sample patient mail — nothing real is emailed out.
           </p>
         ) : null}
         {authMode === "login" || authMode === "forgot" ? (
@@ -158,6 +167,25 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps) {
                 ? "Confirm code"
                 : "Sign in"}
         </button>
+        {authMode === "login" && demoAvailable ? (
+          <button
+            type="button"
+            className="ghost-btn"
+            disabled={busy}
+            onClick={() => {
+              setError(null);
+              setBusy(true);
+              void loginDemo()
+                .then(onSignedIn)
+                .catch((err: unknown) => {
+                  setError(err instanceof Error ? err.message : "Demo login failed");
+                })
+                .finally(() => setBusy(false));
+            }}
+          >
+            Continue as demo visitor
+          </button>
+        ) : null}
         {authMode === "login" ? (
           <button
             type="button"

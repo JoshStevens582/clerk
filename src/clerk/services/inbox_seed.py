@@ -43,17 +43,24 @@ DEMO_INBOX: list[dict[str, str | None]] = [
 
 
 def seed_demo_inbox(db_factory: sessionmaker[Session]) -> None:
+    """Legacy name: ensure sample inbox rows exist (safe when live mail is already present)."""
+    ensure_demo_inbox_samples(db_factory)
+
+
+def ensure_demo_inbox_samples(db_factory: sessionmaker[Session]) -> None:
     with db_factory() as session:
         repo = InboundRepository(session)
-        if repo.count() > 0:
-            return
         for item in DEMO_INBOX:
+            sample_id = item["sample_id"]
+            if sample_id and repo.get_by_sample_id(str(sample_id)) is not None:
+                continue
             repo.create(
                 from_name=str(item["from_name"]),
                 from_email=str(item["from_email"]),
                 subject=str(item["subject"]),
                 body=str(item["body"]),
                 channel=str(item["channel"]),
-                sample_id=item["sample_id"],
+                sample_id=sample_id,
+                source="demo",
             )
         session.commit()

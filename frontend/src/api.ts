@@ -332,6 +332,20 @@ async function publicJson<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export async function fetchDemoStatus(): Promise<boolean> {
+  const parsed = await api<{ available: boolean }>("/api/auth/demo-status");
+  return Boolean(parsed.available);
+}
+
+export async function loginDemo(): Promise<StaffUser> {
+  const parsed = await api<TokenResponse>("/api/auth/demo", { method: "POST" });
+  if (!parsed.access_token || !parsed.refresh_token) {
+    throw new Error("Demo login did not return session tokens.");
+  }
+  storeSessionTokens(parsed.access_token, parsed.refresh_token);
+  return userFromToken(parsed);
+}
+
 export async function login(username: string, password: string): Promise<LoginResult> {
   const parsed = await api<TokenResponse>("/api/auth/login", {
     method: "POST",

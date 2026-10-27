@@ -46,6 +46,7 @@ async def deliver_outbox_for_task(
     db_factory: sessionmaker[Session],
     *,
     task_id: int,
+    demo_dry_run: bool = False,
 ) -> bool:
     """Try SMTP delivery for the newest outbox row on this task. Returns True if sent."""
     with db_factory() as session:
@@ -70,6 +71,16 @@ async def deliver_outbox_for_task(
         if not outbox.to_email:
             outbox.to_email = to_email.lower()
         session.commit()
+
+    if demo_dry_run:
+        with db_factory() as session:
+            outbox = session.get(OutboxRow, outbox_id)
+            if outbox is not None:
+                outbox.delivered = True
+                outbox.delivery_error = "Demo desk — not emailed to a real patient."
+                session.commit()
+        logger.info("outbound demo dry-run task_id=%s to=%s", task_id, to_email)
+        return True
 
     if not smtp_configured(settings):
         with db_factory() as session:

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     clerk_auth_secret: str = "dev-only-change-me"
     owner_password: str = "demo-owner"
     clerk_bootstrap_staff: str = ""
+    # Pipe-separated demo accounts for one-click login (user:pass or user:pass:role).
+    clerk_demo_users: str = "demo:TryClerk2026:staff"
     clerk_admin_usernames: str = "owner"
     redis_url: str = "redis://127.0.0.1:6379/1"
     redis_required: bool = False
@@ -41,6 +43,8 @@ class Settings(BaseSettings):
     password_reset_expose_token_in_response: bool = False
     rate_limit_forgot_password_per_minute: int = 5
     rate_limit_forgot_password_per_day: int = 20
+    rate_limit_demo_per_minute: int = 8
+    rate_limit_demo_per_day: int = 80
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""

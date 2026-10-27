@@ -22,6 +22,10 @@ class LoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class DemoStatusOut(BaseModel):
+    available: bool
+
+
 class MfaLoginRequest(BaseModel):
     mfa_token: str = Field(min_length=16, max_length=512)
     code: str = Field(min_length=6, max_length=32)

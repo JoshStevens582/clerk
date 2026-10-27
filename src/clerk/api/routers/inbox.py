@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
-from clerk.api.deps import ManagerDep, StaffDep, require_staff
+from clerk.api.deps import ManagerDep, StaffDep
 from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.models import InboundMessageRow
 from clerk.schemas.api import CreateInboundIn, InboundMessageOut
 from clerk.schemas.auth import MessageOut
+from clerk.services.demo_accounts import is_demo_staff
 
 router = APIRouter(prefix="/api/inbox", tags=["inbox"])
 
@@ -24,20 +25,32 @@ def _inbound_out(row: InboundMessageRow) -> InboundMessageOut:
     )
 
 
-@router.get("", response_model=list[InboundMessageOut], dependencies=[Depends(require_staff)])
-async def list_inbox(request: Request) -> list[InboundMessageOut]:
+@router.get("", response_model=list[InboundMessageOut])
+async def list_inbox(request: Request, staff: StaffDep) -> list[InboundMessageOut]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
+    settings = request.app.state.settings
     with db_factory() as session:
-        rows = InboundRepository(session).list_open()
+        repo = InboundRepository(session)
+        rows = (
+            repo.list_open_demo_samples()
+            if is_demo_staff(settings, staff.username)
+            else repo.list_open()
+        )
         return [_inbound_out(row) for row in rows]
 
 
-@router.post("", response_model=InboundMessageOut, dependencies=[Depends(require_staff)])
+@router.post("", response_model=InboundMessageOut)
 async def create_inbound(
     payload: CreateInboundIn,
     request: Request,
-    _: StaffDep,
+    staff: StaffDep,
 ) -> InboundMessageOut:
+    settings = request.app.state.settings
+    if is_demo_staff(settings, staff.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo desk is read-only for inbound mail.",
+        )
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     with db_factory() as session:
         row = InboundRepository(session).create(

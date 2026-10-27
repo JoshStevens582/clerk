@@ -19,7 +19,8 @@ from clerk.config import load_settings, require_secure_auth_secret
 from clerk.repositories.db import create_db_engine, init_db, session_factory
 from clerk.services.agent import ClerkAgentService
 from clerk.services.auth_rate_limit import AuthRateLimiter
-from clerk.services.inbox_seed import seed_demo_inbox
+from clerk.services.demo_accounts import ensure_demo_staff_users
+from clerk.services.inbox_seed import ensure_demo_inbox_samples
 from clerk.services.login_lockout import LoginLockout
 from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
@@ -72,8 +73,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if app.state.resend_api_access == ResendApiAccess.FULL:
         poll_task = asyncio.create_task(resend_inbound_poll_loop(app))
     bootstrap_staff_users(settings, db_factory)
-    if settings.clerk_seed_demo_inbox:
-        seed_demo_inbox(db_factory)
+    ensure_demo_staff_users(settings, db_factory)
+    if settings.clerk_seed_demo_inbox or settings.clerk_demo_users.strip():
+        ensure_demo_inbox_samples(db_factory)
     yield
     if poll_task is not None:
         poll_task.cancel()

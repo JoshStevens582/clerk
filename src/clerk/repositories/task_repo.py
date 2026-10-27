@@ -1,10 +1,10 @@
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from clerk.repositories.models import OutboxRow, TaskRow
+from clerk.repositories.models import InboundMessageRow, OutboxRow, TaskRow
 from clerk.schemas.agent import PolicyOutcome, PolicyOutcomeKind, ProposalKind, QueueStatus
 
 _PENDING_BOOKING_DISCLAIMER = "Time not held until approved."
@@ -79,6 +79,46 @@ class TaskRepository:
             select(TaskRow)
             .where(TaskRow.status == "pending")
             .order_by(TaskRow.created_at.desc())
+        )
+        return list(self._session.scalars(stmt))
+
+    def list_pending_demo(self) -> list[TaskRow]:
+        stmt = (
+            select(TaskRow)
+            .outerjoin(InboundMessageRow, TaskRow.inbound_message_id == InboundMessageRow.id)
+            .where(
+                TaskRow.status == "pending",
+                or_(
+                    TaskRow.inbound_message_id.is_(None),
+                    InboundMessageRow.sample_id.is_not(None),
+                ),
+            )
+            .order_by(TaskRow.created_at.desc())
+        )
+        return list(self._session.scalars(stmt))
+
+    def is_demo_task(self, task_id: int) -> bool:
+        row = self.get(task_id)
+        if row is None:
+            return False
+        if row.inbound_message_id is None:
+            return True
+        inbound = self._session.get(InboundMessageRow, row.inbound_message_id)
+        return inbound is not None and inbound.sample_id is not None
+
+    def list_outbox_demo(self, limit: int = 50) -> list[OutboxRow]:
+        stmt = (
+            select(OutboxRow)
+            .join(TaskRow, OutboxRow.source_task_id == TaskRow.id)
+            .outerjoin(InboundMessageRow, TaskRow.inbound_message_id == InboundMessageRow.id)
+            .where(
+                or_(
+                    TaskRow.inbound_message_id.is_(None),
+                    InboundMessageRow.sample_id.is_not(None),
+                )
+            )
+            .order_by(OutboxRow.sent_at.desc())
+            .limit(limit)
         )
         return list(self._session.scalars(stmt))
 

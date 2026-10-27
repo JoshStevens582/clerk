@@ -30,6 +30,28 @@ class InboundRepository:
         )
         return list(self._session.scalars(stmt))
 
+    def list_open_demo_samples(self) -> list[InboundMessageRow]:
+        stmt = (
+            select(InboundMessageRow)
+            .where(
+                InboundMessageRow.task_id.is_(None),
+                InboundMessageRow.sample_id.is_not(None),
+            )
+            .order_by(InboundMessageRow.created_at.desc())
+        )
+        return list(self._session.scalars(stmt))
+
+    def get_by_sample_id(self, sample_id: str) -> InboundMessageRow | None:
+        normalized = sample_id.strip()
+        if not normalized:
+            return None
+        stmt = (
+            select(InboundMessageRow)
+            .where(InboundMessageRow.sample_id == normalized)
+            .limit(1)
+        )
+        return self._session.scalar(stmt)
+
     def list_recent(self, *, limit: int = 50) -> list[InboundMessageRow]:
         stmt = (
             select(InboundMessageRow)

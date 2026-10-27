@@ -20,6 +20,7 @@ def client(tmp_path) -> TestClient:
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path / 'clerk.db'}"
     os.environ["CLERK_BOOTSTRAP_STAFF"] = "owner:test-pass-99:manager,reception:test-pass-99:staff"
     os.environ["CLERK_AUTH_SECRET"] = TEST_AUTH_SECRET
+    os.environ["CLERK_DEMO_USERS"] = ""
     os.environ["LOGIN_LOCKOUT_ENABLED"] = "false"
     os.environ["RATE_LIMIT_FAIL_CLOSED"] = "false"
     os.environ["RATE_LIMIT_ENABLED"] = "false"

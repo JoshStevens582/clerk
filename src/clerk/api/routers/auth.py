@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
 from clerk.api.auth_security import (
+    DemoRateLimitDep,
     ForgotPasswordRateLimitDep,
     LoginRateLimitDep,
     RefreshRateLimitDep,
@@ -13,6 +14,7 @@ from clerk.api.deps import StaffDep
 from clerk.repositories.staff_repo import StaffRepository
 from clerk.schemas.auth import (
     ChangePasswordRequest,
+    DemoStatusOut,
     ForgotPasswordRequest,
     LoginIn,
     MeOut,
@@ -29,6 +31,7 @@ from clerk.schemas.auth import (
     UpdateEmailRequest,
 )
 from clerk.schemas.staff import StaffUserOut
+from clerk.services.demo_accounts import first_demo_credentials
 from clerk.services.jwt_tokens import issue_mfa_challenge_token, verify_mfa_challenge_token
 from clerk.services.mfa import (
     AuthError as MfaAuthError,
@@ -97,6 +100,46 @@ def _complete_login(request: Request, user: object, username: str) -> TokenOut:
         )
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     pair = issue_session_pair(db_factory, settings, user=user)
+    return _token_out_from_pair(pair)
+
+
+@router.get("/demo-status", response_model=DemoStatusOut)
+async def demo_status(request: Request) -> DemoStatusOut:
+    settings = request.app.state.settings
+    return DemoStatusOut(available=bool(settings.clerk_demo_users.strip()))
+
+
+@router.post("/demo", response_model=TokenOut)
+async def demo_login(
+    request: Request,
+    _: DemoRateLimitDep,
+) -> TokenOut:
+    """One-click public demo — same session as a normal login, no password typing."""
+    _require_auth_secret(request)
+    settings = request.app.state.settings
+    creds = first_demo_credentials(settings)
+    if creds is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No demo account is configured.",
+        )
+    demo_username, demo_password = creds
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        user_out = authenticate(session, username=demo_username, password=demo_password)
+    if user_out is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo account is not available yet. Try again in a moment.",
+        )
+    with db_factory() as session:
+        row = StaffRepository(session).get_by_username(user_out.username)
+    if row is None or not row.active:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo account is not available.",
+        )
+    pair = issue_session_pair(db_factory, settings, user=row)
     return _token_out_from_pair(pair)
 
 
