@@ -79,7 +79,7 @@ def test_approve_delivers_when_smtp_mocked(
         patch(
             "clerk.services.outbound_delivery.send_plain_email",
             new_callable=AsyncMock,
-            return_value=True,
+            return_value=(True, None),
         ),
     ):
         approved = client.post(f"/api/queue/{task_id}/approve", headers=owner_auth)

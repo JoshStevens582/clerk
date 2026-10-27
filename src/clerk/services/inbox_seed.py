@@ -9,7 +9,7 @@ from clerk.repositories.inbound_repo import InboundRepository
 DEMO_INBOX: list[dict[str, str | None]] = [
     {
         "from_name": "Sarah Nkomo",
-        "from_email": "sarah.nkomo@example.com",
+        "from_email": "demo+sarah@customchatandautomation.co.za",
         "subject": "Anything on Thursday?",
         "body": "Do you have anything on Thursday?",
         "channel": "Email",
@@ -17,7 +17,7 @@ DEMO_INBOX: list[dict[str, str | None]] = [
     },
     {
         "from_name": "James Patel",
-        "from_email": "james.patel@example.com",
+        "from_email": "demo+james@customchatandautomation.co.za",
         "subject": "Booking request — Thursday morning",
         "body": "Please book me for Thursday at 10:00.",
         "channel": "Web form",
@@ -25,7 +25,7 @@ DEMO_INBOX: list[dict[str, str | None]] = [
     },
     {
         "from_name": "Lindiwe Mokoena",
-        "from_email": "lindiwe.m@example.com",
+        "from_email": "demo+lindiwe@customchatandautomation.co.za",
         "subject": "Tax return — what to send",
         "body": "Email me what you need for the tax return.",
         "channel": "Email",
@@ -33,7 +33,7 @@ DEMO_INBOX: list[dict[str, str | None]] = [
     },
     {
         "from_name": "Internal — front desk",
-        "from_email": "frontdesk@capephysio.local",
+        "from_email": "demo+frontdesk@customchatandautomation.co.za",
         "subject": "Leave carry-over — action needed",
         "body": "Email HR that I want those 5 days carry-over leave.",
         "channel": "Email",

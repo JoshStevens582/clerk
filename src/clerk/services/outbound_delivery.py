@@ -79,7 +79,7 @@ async def deliver_outbox_for_task(
                 session.commit()
         return False
 
-    sent = await send_plain_email(
+    sent, smtp_error = await send_plain_email(
         settings,
         to_address=to_email,
         subject=subject,
@@ -94,6 +94,6 @@ async def deliver_outbox_for_task(
             outbox.delivery_error = None
             logger.info("outbound delivered task_id=%s to=%s", task_id, to_email)
         else:
-            outbox.delivery_error = "SMTP send failed."
+            outbox.delivery_error = smtp_error or "SMTP send failed."
         session.commit()
     return sent

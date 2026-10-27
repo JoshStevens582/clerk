@@ -18,13 +18,13 @@ async def send_plain_email(
     to_address: str,
     subject: str,
     body: str,
-) -> bool:
+) -> tuple[bool, str | None]:
     if not settings.smtp_host.strip():
-        return False
+        return False, "SMTP is not configured."
     sender = settings.smtp_from.strip() or settings.smtp_username.strip()
     if not sender:
         logger.warning("SMTP missing smtp_from/smtp_username")
-        return False
+        return False, "SMTP_FROM is not set."
 
     message = EmailMessage()
     message["Subject"] = subject
@@ -35,9 +35,10 @@ async def send_plain_email(
     try:
         await asyncio.to_thread(_smtp_send, settings, message)
     except Exception as exc:
-        logger.warning("SMTP send failed: %s", type(exc).__name__)
-        return False
-    return True
+        detail = str(exc).strip() or type(exc).__name__
+        logger.warning("SMTP send failed to=%s: %s", to_address, detail)
+        return False, detail
+    return True, None
 
 
 def _smtp_send(settings: Settings, message: EmailMessage) -> None:

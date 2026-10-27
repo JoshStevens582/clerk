@@ -71,7 +71,7 @@ async def request_password_reset(
         session.commit()
 
     link = reset_link(settings, raw_token)
-    sent = await send_plain_email(
+    sent, _smtp_error = await send_plain_email(
         settings,
         to_address=user.email,
         subject="Clerk password reset",
