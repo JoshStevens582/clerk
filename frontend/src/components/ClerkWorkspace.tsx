@@ -109,7 +109,46 @@ export function ClerkWorkspace({
             {pending} awaiting approval
           </span>
         </div>
-        <p className="section-label">Inbox</p>
+        {queue.length > 0 ? (
+          <>
+            <p className="section-label">Needs your approval ({queue.length})</p>
+            <div className="stack approval-sidebar">
+              {queue.map((item) => (
+                <div key={item.id} className="source-card approval-card">
+                  <strong>{kindLabel(item.kind)}</strong>
+                  <p className="inbound-ref">
+                    {item.inbound_text.length > 80
+                      ? `${item.inbound_text.slice(0, 80)}…`
+                      : item.inbound_text}
+                  </p>
+                  <div className="approval-actions">
+                    <button
+                      type="button"
+                      className="send"
+                      disabled={busy}
+                      onClick={() => onApprove(item.id)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      disabled={busy}
+                      onClick={() => onReject(item.id)}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+        <p className="section-label">Inbox — not handled yet</p>
+        <p className="muted-copy inbox-hint">
+          Messages disappear after you open them once. Approvals stay in the list above until you
+          approve or reject.
+        </p>
         <button
           type="button"
           className="new-chat"
@@ -244,29 +283,8 @@ export function ClerkWorkspace({
         <div className="workspace-body">
           {error ? <p className="error banner">{error}</p> : null}
 
-          {selected ? (
-            <article className="bubble user">
-              <p className="message-meta">Inbound</p>
-              {selected.body}
-            </article>
-          ) : (
-            <div className="empty">
-              <p>New patient and client mail appears in the left column.</p>
-            </div>
-          )}
-
-          {lastResult && selected ? (
-            <article className="bubble assistant">
-              <p className="message-meta">Clerk</p>
-              <p>{lastResult.message}</p>
-              {lastResult.auto_reply_text ? (
-                <blockquote className="auto-sent">{lastResult.auto_reply_text}</blockquote>
-              ) : null}
-            </article>
-          ) : null}
-
           {queue.length > 0 ? (
-            <section className="approval-section">
+            <section className="approval-section approval-section-top">
               <p className="section-label">Awaiting your approval</p>
               {queue.map((item) => (
                 <div key={item.id} className="source-card approval-card">
@@ -307,6 +325,27 @@ export function ClerkWorkspace({
                 </div>
               ))}
             </section>
+          ) : null}
+
+          {selected ? (
+            <article className="bubble user">
+              <p className="message-meta">Inbound</p>
+              {selected.body}
+            </article>
+          ) : queue.length === 0 ? (
+            <div className="empty">
+              <p>Pick a message in the left inbox, or add one with Add inbound message.</p>
+            </div>
+          ) : null}
+
+          {lastResult && selected ? (
+            <article className="bubble assistant">
+              <p className="message-meta">Clerk</p>
+              <p>{lastResult.message}</p>
+              {lastResult.auto_reply_text ? (
+                <blockquote className="auto-sent">{lastResult.auto_reply_text}</blockquote>
+              ) : null}
+            </article>
           ) : null}
         </div>
       </main>

@@ -304,6 +304,23 @@ a {
   gap: 12px;
 }
 
+.approval-section-top {
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(94, 234, 212, 0.06);
+}
+
+.approval-sidebar .approval-actions {
+  margin-top: 8px;
+}
+
+.inbox-hint {
+  margin: -6px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .source-card {
   border: 1px solid var(--line);
   border-radius: 14px;
