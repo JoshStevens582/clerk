@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_use_tls: bool = True
     clerk_inbound_webhook_secret: str = ""
+    resend_api_key: str = ""
+    resend_webhook_secret: str = ""
+    clerk_inbound_address: str = ""
+    clerk_seed_demo_inbox: bool = True
     # Workflow / patient message caps (SQLite counters, separate from auth Redis limits)
     rate_limit_per_minute: int = 10
     rate_limit_per_day: int = 40

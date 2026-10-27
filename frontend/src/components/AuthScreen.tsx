@@ -92,6 +92,12 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps) {
           <strong>CLERK</strong>
           <span>{heading()}</span>
         </div>
+        {authMode === "login" ? (
+          <p className="login-copy">
+            Desk for Cape Town Physio: patient mail is processed automatically; you approve
+            bookings and outbound emails.
+          </p>
+        ) : null}
         {authMode === "login" || authMode === "forgot" ? (
           <label>
             Username

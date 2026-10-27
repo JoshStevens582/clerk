@@ -80,5 +80,7 @@ class HealthOut(BaseModel):
     status: Literal["ok"] = "ok"
     openai_configured: bool
     smtp_configured: bool
+    inbound_automation_ready: bool
+    inbound_address: str
     pages_dir: str
     pending_count: int

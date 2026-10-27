@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from clerk.repositories.task_repo import TaskRepository
 from clerk.schemas.api import HealthOut, LiveOut, ReadyOut
 from clerk.services.outbound_delivery import smtp_configured
+from clerk.services.resend_inbound import inbound_automation_ready
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -42,6 +43,8 @@ async def health(request: Request) -> HealthOut:
     return HealthOut(
         openai_configured=settings.openai_configured,
         smtp_configured=smtp_configured(settings),
+        inbound_automation_ready=inbound_automation_ready(settings),
+        inbound_address=settings.clerk_inbound_address.strip(),
         pages_dir=settings.pages_dir,
         pending_count=pending,
     )

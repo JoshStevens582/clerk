@@ -85,6 +85,12 @@ export function ClerkWorkspace({
           <span>Inbox automation</span>
         </div>
         <p className="workspace-name">Cape Town Physio</p>
+        {health?.inbound_address ? (
+          <p className="muted-copy inbox-hint">
+            Patient mail to <strong>{health.inbound_address}</strong> lands here automatically
+            {health.inbound_automation_ready ? "" : " (finish Resend receiving setup in docs)"}.
+          </p>
+        ) : null}
         <p className="section-label">
           Signed in as {user.username}
           {user.role === "manager" ? " · manager" : ""}

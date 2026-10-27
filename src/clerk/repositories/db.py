@@ -65,6 +65,23 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             with engine.begin() as connection:
                 for statement in task_alters:
                     connection.execute(text(statement))
+    if "inbound_messages" in table_names:
+        inbound_columns = {
+            column["name"] for column in inspector.get_columns("inbound_messages")
+        }
+        inbound_alters: list[str] = []
+        if "source" not in inbound_columns:
+            inbound_alters.append(
+                "ALTER TABLE inbound_messages ADD COLUMN source VARCHAR(32) DEFAULT 'manual'"
+            )
+        if "external_id" not in inbound_columns:
+            inbound_alters.append(
+                "ALTER TABLE inbound_messages ADD COLUMN external_id VARCHAR(128)"
+            )
+        if inbound_alters:
+            with engine.begin() as connection:
+                for statement in inbound_alters:
+                    connection.execute(text(statement))
     if "outbox" in table_names:
         outbox_columns = {column["name"] for column in inspector.get_columns("outbox")}
         outbox_alters: list[str] = []

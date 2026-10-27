@@ -19,7 +19,9 @@ Summary:
 
 Copy the same `SMTP_*` values as Atlas into `/opt/clerk/.env` so password reset and **approved / auto-replies** send to the patient email on each inbound message. The desk shows **SMTP ready** when configured.
 
-Optional inbound automation: set `CLERK_INBOUND_WEBHOOK_SECRET` and `POST` JSON to `/api/hooks/inbound` with header `X-Clerk-Inbound-Secret`. Staff can also use **Add inbound message** in the UI.
+**Launch inbound mail:** follow [launch-inbound.md](launch-inbound.md) (Resend receiving + webhook to `/api/hooks/resend`).
+
+Generic integration: `CLERK_INBOUND_WEBHOOK_SECRET` + `POST /api/hooks/inbound` with header `X-Clerk-Inbound-Secret`.
 
 ## Local Docker smoke test
 

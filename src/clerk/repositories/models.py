@@ -89,6 +89,8 @@ class InboundMessageRow(Base):
     body: Mapped[str] = mapped_column(Text)
     channel: Mapped[str] = mapped_column(String(32), default="Email")
     sample_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str] = mapped_column(String(32), default="manual")
+    external_id: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
     task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

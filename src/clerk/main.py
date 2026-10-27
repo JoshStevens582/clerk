@@ -64,7 +64,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.login_lockout = login_lockout
     app.state.redis_client = redis_client
     bootstrap_staff_users(settings, db_factory)
-    seed_demo_inbox(db_factory)
+    if settings.clerk_seed_demo_inbox:
+        seed_demo_inbox(db_factory)
     yield
     if redis_client is not None:
         await redis_client.aclose()
