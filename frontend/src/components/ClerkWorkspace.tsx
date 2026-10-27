@@ -89,6 +89,7 @@ export function ClerkWorkspace({
 
   const appClass = [
     "app",
+    "app--clerk",
     sentCollapsed ? "app--sent-collapsed" : "",
     `app--mobile-${mobilePane}`,
   ]
@@ -125,10 +126,18 @@ export function ClerkWorkspace({
       </nav>
       <aside className="panel sidebar">
         <div className="brand">
-          <strong>CLERK</strong>
-          <span>Inbox automation</span>
+          <img src="/brand/clerk-mark.svg" alt="" className="brand-mark" width={40} height={40} />
+          <div className="brand-text">
+            <strong>CLERK</strong>
+            <span>Inbox desk — draft from your pages, you approve sends</span>
+          </div>
         </div>
-        <p className="workspace-name">Cape Town Physio</p>
+        <p className="product-audience">For staff · approval before send</p>
+        <p className="workspace-name">Demo clinic: Cape Town Physio</p>
+        <p className="product-one-liner">
+          Not Counter (visitor chat) or Atlas (handbook) — this runs on patient email and your
+          outbox queue.
+        </p>
         {health?.inbound_address ? (
           <p className="muted-copy inbox-hint">
             Patient address: <strong>{health.inbound_address}</strong>
@@ -325,13 +334,16 @@ export function ClerkWorkspace({
           Sign out
         </button>
         <p className="suite-links">
+          <span className="suite-links-lead">Other products</span>
           <a href="https://counter.customchatandautomation.co.za" target="_blank" rel="noreferrer">
             Counter
           </a>
+          <span className="suite-muted"> visitor chat</span>
           {" · "}
           <a href="https://atlas.customchatandautomation.co.za" target="_blank" rel="noreferrer">
             Atlas
           </a>
+          <span className="suite-muted"> staff handbook</span>
         </p>
       </aside>
 
@@ -362,8 +374,11 @@ export function ClerkWorkspace({
             </>
           ) : (
             <>
-              <h1>Inbox</h1>
-              <p>Select a message to run Clerk on it.</p>
+              <h1>Inbox desk</h1>
+              <p>
+                Clerk reads patient mail, pulls facts from approved pages, and queues drafts — nothing
+                sends until staff approve.
+              </p>
             </>
           )}
         </header>

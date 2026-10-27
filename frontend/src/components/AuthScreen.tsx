@@ -95,12 +95,16 @@ export function AuthScreen({ onSignedIn }: AuthScreenProps) {
   }
 
   return (
-    <div className="login-screen">
+    <div className="login-screen app--clerk">
       <form className="panel login-card" onSubmit={(e) => void onSubmit(e)}>
         <div className="brand">
-          <strong>CLERK</strong>
-          <span>{heading()}</span>
+          <img src="/brand/clerk-mark.svg" alt="" className="brand-mark" width={40} height={40} />
+          <div className="brand-text">
+            <strong>CLERK</strong>
+            <span>{heading()}</span>
+          </div>
         </div>
+        <p className="product-audience">For staff · inbox automation</p>
         {authMode === "login" ? (
           <p className="login-copy">
             Try the live demo with one click, or sign in with the staff account your clinic was
