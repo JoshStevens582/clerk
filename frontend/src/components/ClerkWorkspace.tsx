@@ -4,6 +4,7 @@ import { kindLabel } from "../labels";
 
 type ClerkWorkspaceProps = {
   user: StaffUser;
+  mfaEnabled: boolean;
   health: HealthStatus | null;
   queue: QueueItem[];
   outbox: OutboxItem[];
@@ -15,11 +16,13 @@ type ClerkWorkspaceProps = {
   onSelectInbox: (message: InboxMessage) => void;
   onApprove: (taskId: number) => void;
   onReject: (taskId: number) => void;
+  onOpenSecurity: () => void;
   onLogout: () => void;
 };
 
 export function ClerkWorkspace({
   user,
+  mfaEnabled,
   health,
   queue,
   outbox,
@@ -31,6 +34,7 @@ export function ClerkWorkspace({
   onSelectInbox,
   onApprove,
   onReject,
+  onOpenSecurity,
   onLogout,
 }: ClerkWorkspaceProps) {
   const pending = queue.length;
@@ -85,6 +89,9 @@ export function ClerkWorkspace({
             );
           })}
         </div>
+        <button type="button" className="new-chat" onClick={onOpenSecurity}>
+          Security{mfaEnabled ? " · MFA on" : ""}
+        </button>
         <button type="button" className="new-chat" onClick={onLogout}>
           Sign out
         </button>

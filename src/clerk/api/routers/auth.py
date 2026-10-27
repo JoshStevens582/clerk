@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
 from clerk.api.auth_security import (
+    ForgotPasswordRateLimitDep,
     LoginRateLimitDep,
     RefreshRateLimitDep,
     assert_login_not_locked,
@@ -12,6 +13,7 @@ from clerk.api.deps import StaffDep
 from clerk.repositories.staff_repo import StaffRepository
 from clerk.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginIn,
     MeOut,
     MessageOut,
@@ -22,17 +24,29 @@ from clerk.schemas.auth import (
     MfaSetupOut,
     MfaSetupRequest,
     RefreshTokenRequest,
+    ResetPasswordRequest,
     TokenOut,
+    UpdateEmailRequest,
 )
 from clerk.schemas.staff import StaffUserOut
 from clerk.services.jwt_tokens import issue_mfa_challenge_token, verify_mfa_challenge_token
 from clerk.services.mfa import (
-    AuthError,
+    AuthError as MfaAuthError,
+)
+from clerk.services.mfa import (
     MfaRejected,
     accept_second_factor,
     begin_mfa_setup,
     confirm_mfa_setup,
     disable_mfa,
+    regenerate_recovery_codes,
+)
+from clerk.services.password_reset import (
+    AuthError as ResetAuthError,
+)
+from clerk.services.password_reset import (
+    request_password_reset,
+    reset_password_with_token,
 )
 from clerk.services.refresh_tokens import (
     RefreshError,
@@ -42,7 +56,7 @@ from clerk.services.refresh_tokens import (
     rotate_refresh_token,
     staff_role,
 )
-from clerk.services.staff_auth import authenticate, hash_password, verify_password
+from clerk.services.staff_auth import authenticate, hash_password, staff_user_out, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -159,7 +173,7 @@ async def login_mfa(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
-    except AuthError as exc:
+    except MfaAuthError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await record_login_outcome(request, username=username, success=True)
     pair = issue_session_pair(db_factory, settings, user=user)
@@ -200,11 +214,81 @@ async def logout_session(
 
 
 @router.get("/me", response_model=MeOut)
-async def me(staff: StaffDep) -> MeOut:
-    return MeOut(
-        user=StaffUserOut(username=staff.username, role=staff.role, display_name=None),
-        mfa_enabled=staff.mfa_enabled,
+async def me(staff: StaffDep, request: Request) -> MeOut:
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        row = StaffRepository(session).get_by_id(staff.user_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
+    return MeOut(user=staff_user_out(row), mfa_enabled=staff.mfa_enabled)
+
+
+@router.post("/forgot-password", response_model=MessageOut)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    _: ForgotPasswordRateLimitDep,
+) -> MessageOut:
+    _require_auth_secret(request)
+    result = await request_password_reset(
+        request.app.state.db_factory,
+        request.app.state.settings,
+        username=payload.username,
     )
+    return MessageOut(message=result.message, dev_reset_token=result.dev_reset_token)
+
+
+@router.post("/reset-password", response_model=MessageOut)
+async def reset_password_route(
+    payload: ResetPasswordRequest,
+    request: Request,
+    _: LoginRateLimitDep,
+) -> MessageOut:
+    _require_auth_secret(request)
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    try:
+        username = reset_password_with_token(
+            db_factory,
+            raw_token=payload.token,
+            new_password=payload.password,
+        )
+    except ResetAuthError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    with db_factory() as session:
+        row = StaffRepository(session).get_by_username(username)
+    if row is not None:
+        revoke_all_refresh_sessions(db_factory, user_id=row.id)
+    await clear_login_lockout(request, username)
+    return MessageOut(message="Password updated. You can sign in with the new password.")
+
+
+@router.post("/profile/email", response_model=StaffUserOut)
+async def update_email(
+    payload: UpdateEmailRequest,
+    request: Request,
+    staff: StaffDep,
+) -> StaffUserOut:
+    normalized = payload.email.strip().lower()
+    if not normalized or "@" not in normalized:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email.")
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        repo = StaffRepository(session)
+        row = repo.get_by_id(staff.user_id)
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated.",
+            )
+        existing = repo.get_by_email(normalized)
+        if existing is not None and existing.id != row.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="That email is in use.",
+            )
+        row.email = normalized
+        session.commit()
+        return staff_user_out(row)
 
 
 @router.post("/change-password", response_model=MessageOut)
@@ -245,7 +329,7 @@ async def mfa_setup(
         )
     except MfaRejected as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except AuthError as exc:
+    except MfaAuthError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MfaSetupOut(
         secret=setup.secret,
@@ -268,7 +352,7 @@ async def mfa_confirm(
             username=staff.username,
             code=payload.code,
         )
-    except (MfaRejected, AuthError) as exc:
+    except (MfaRejected, MfaAuthError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     revoke_all_refresh_sessions(request.app.state.db_factory, user_id=staff.user_id)
     return MfaConfirmOut(recovery_codes=codes)
@@ -289,7 +373,27 @@ async def mfa_disable(
             password=payload.password,
             code=payload.code,
         )
-    except (MfaRejected, AuthError) as exc:
+    except (MfaRejected, MfaAuthError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     revoke_all_refresh_sessions(request.app.state.db_factory, user_id=staff.user_id)
     return MessageOut(message="Authenticator turned off.")
+
+
+@router.post("/mfa/recovery-codes/regenerate", response_model=MfaConfirmOut)
+async def mfa_regenerate_recovery_codes(
+    payload: MfaDisableRequest,
+    request: Request,
+    staff: StaffDep,
+) -> MfaConfirmOut:
+    _require_auth_secret(request)
+    try:
+        codes = regenerate_recovery_codes(
+            request.app.state.db_factory,
+            request.app.state.settings,
+            username=staff.username,
+            password=payload.password,
+            code=payload.code,
+        )
+    except (MfaRejected, MfaAuthError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return MfaConfirmOut(recovery_codes=codes)

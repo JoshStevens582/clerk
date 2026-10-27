@@ -2,12 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   approveTask,
-  completeMfaLogin,
   fetchHealth,
+  fetchMe,
   fetchOutbox,
   fetchQueue,
   fetchSession,
-  login,
   logout,
   type StaffUser,
   rejectTask,
@@ -18,16 +17,15 @@ import {
   type OutboxItem,
   type QueueItem,
 } from "./api";
+import { AuthScreen } from "./components/AuthScreen";
 import { ClerkWorkspace } from "./components/ClerkWorkspace";
-import { LoginScreen } from "./components/LoginScreen";
+import { SecurityPanel } from "./components/SecurityPanel";
 import type { InboxMessage } from "./inbox";
 
 export function App() {
   const [user, setUser] = useState<StaffUser | null>(null);
-  const [username, setUsername] = useState("reception");
-  const [password, setPassword] = useState("");
-  const [mfaCode, setMfaCode] = useState("");
-  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -44,35 +42,27 @@ export function App() {
     setHealth(h);
   }, []);
 
-  async function handleLogin(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
+  async function loadMe() {
+    const me = await fetchMe();
+    setUser(me.user);
+    setMfaEnabled(me.mfa_enabled);
+  }
+
+  async function handleSignedIn(signedIn: StaffUser) {
+    setUser(signedIn);
     try {
-      if (mfaToken) {
-        const signedIn = await completeMfaLogin(mfaToken, mfaCode);
-        setUser(signedIn);
-        setMfaToken(null);
-        setMfaCode("");
-        await refresh();
-        return;
-      }
-      const result = await login(username, password);
-      if (result.mfaRequired && result.mfaToken) {
-        setMfaToken(result.mfaToken);
-        setPassword("");
-        return;
-      }
-      setUser(result.user);
+      await loadMe();
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Could not load session.");
     }
   }
 
   async function handleLogout() {
     await logout();
     setUser(null);
-    setMfaToken(null);
+    setMfaEnabled(false);
+    setSecurityOpen(false);
     setQueue([]);
     setOutbox([]);
     setLastResult(null);
@@ -126,8 +116,9 @@ export function App() {
   useEffect(() => {
     void fetchSession().then((session) => {
       if (session?.username) {
-        setUser(session);
-        void refresh();
+        void loadMe()
+          .then(() => refresh())
+          .catch(() => setUser(null));
       }
     });
   }, [refresh]);
@@ -144,32 +135,27 @@ export function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || securityOpen) {
       return;
     }
     const timer = window.setInterval(() => {
       void refresh();
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [user, refresh]);
+  }, [user, securityOpen, refresh]);
 
   if (!user) {
+    return <AuthScreen onSignedIn={(signedIn) => void handleSignedIn(signedIn)} />;
+  }
+
+  if (securityOpen) {
     return (
-      <LoginScreen
-        username={username}
-        password={password}
-        mfaCode={mfaCode}
-        mfaStep={Boolean(mfaToken)}
-        error={error}
-        onUsernameChange={setUsername}
-        onPasswordChange={setPassword}
-        onMfaCodeChange={setMfaCode}
-        onSubmit={handleLogin}
-        onBackFromMfa={() => {
-          setMfaToken(null);
-          setMfaCode("");
-          setError(null);
-        }}
+      <SecurityPanel
+        user={user}
+        mfaEnabled={mfaEnabled}
+        onBack={() => setSecurityOpen(false)}
+        onMfaEnabledChange={setMfaEnabled}
+        onUserUpdate={setUser}
       />
     );
   }
@@ -177,6 +163,7 @@ export function App() {
   return (
     <ClerkWorkspace
       user={user}
+      mfaEnabled={mfaEnabled}
       health={health}
       queue={queue}
       outbox={outbox}
@@ -188,6 +175,7 @@ export function App() {
       onSelectInbox={(message) => void handleSelectInbox(message)}
       onApprove={handleApprove}
       onReject={handleReject}
+      onOpenSecurity={() => setSecurityOpen(true)}
       onLogout={() => void handleLogout()}
     />
   );

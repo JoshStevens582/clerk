@@ -39,6 +39,18 @@ export type StaffUser = {
   username: string;
   role: "staff" | "manager";
   display_name: string | null;
+  email?: string | null;
+};
+
+export type Me = {
+  user: StaffUser;
+  mfa_enabled: boolean;
+};
+
+export type MfaSetup = {
+  secret: string;
+  otpauth_uri: string;
+  qr_data_uri: string;
 };
 
 export type LoginResult = {
@@ -263,7 +275,25 @@ type TokenResponse = {
 };
 
 function userFromToken(parsed: TokenResponse): StaffUser {
-  return { username: parsed.username, role: parsed.role, display_name: null };
+  return { username: parsed.username, role: parsed.role, display_name: null, email: null };
+}
+
+async function publicJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (!response.ok) {
+    let message = response.statusText;
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      message = formatApiDetail(body.detail ?? body);
+    } catch {
+      message = await response.text();
+    }
+    throw new Error(message || response.statusText);
+  }
+  return (await response.json()) as T;
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
@@ -301,17 +331,89 @@ export async function completeMfaLogin(mfaToken: string, code: string): Promise<
   return userFromToken(parsed);
 }
 
+export async function fetchMe(): Promise<Me> {
+  return api<Me>("/api/auth/me");
+}
+
 export async function fetchSession(): Promise<StaffUser | null> {
   if (!hasSession()) {
     return null;
   }
   try {
-    const me = await api<{ user: StaffUser }>("/api/auth/me");
+    const me = await fetchMe();
     return me.user;
   } catch {
     failLocalSession();
     return null;
   }
+}
+
+export async function forgotPassword(username: string): Promise<{
+  message: string;
+  dev_reset_token?: string | null;
+}> {
+  return publicJson("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ username }),
+  });
+}
+
+export async function resetPassword(token: string, password: string): Promise<string> {
+  const parsed = await publicJson<{ message: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+  return parsed.message;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<string> {
+  const parsed = await api<{ message: string }>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  return parsed.message;
+}
+
+export async function updateEmail(email: string): Promise<StaffUser> {
+  return api<StaffUser>("/api/auth/profile/email", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function startMfaSetup(password: string): Promise<MfaSetup> {
+  return api<MfaSetup>("/api/auth/mfa/setup", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function confirmMfaSetup(code: string): Promise<string[]> {
+  const parsed = await api<{ recovery_codes: string[] }>("/api/auth/mfa/confirm", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+  return parsed.recovery_codes;
+}
+
+export async function disableMfa(password: string, code: string): Promise<string> {
+  const parsed = await api<{ message: string }>("/api/auth/mfa/disable", {
+    method: "POST",
+    body: JSON.stringify({ password, code }),
+  });
+  return parsed.message;
+}
+
+export async function regenerateRecoveryCodes(password: string, code: string): Promise<string[]> {
+  const parsed = await api<{ recovery_codes: string[] }>("/api/auth/mfa/recovery-codes/regenerate", {
+    method: "POST",
+    body: JSON.stringify({ password, code }),
+  });
+  return parsed.recovery_codes;
+}
+
+export async function clearStaffMfa(username: string): Promise<void> {
+  await api(`/api/staff/users/${encodeURIComponent(username)}/mfa/reset`, { method: "POST" });
 }
 
 export async function logout(): Promise<void> {

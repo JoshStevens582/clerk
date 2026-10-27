@@ -226,3 +226,51 @@ def disable_mfa(
         MfaRepository(session).clear(user)
         session.commit()
     logger.info("mfa disabled username=%s", username)
+
+
+def regenerate_recovery_codes(
+    db_factory: sessionmaker[Session],
+    settings: Settings,
+    *,
+    username: str,
+    password: str,
+    code: str,
+    now: datetime | None = None,
+) -> list[str]:
+    with db_factory() as session:
+        user = StaffRepository(session).get_by_username(username)
+        if user is None:
+            raise AuthError("Account not found.")
+        if user.mfa_enabled_at is None:
+            raise AuthError("Turn authenticator on before generating recovery codes.")
+        if not verify_password(password, user.password_hash):
+            raise MfaRejected("Password did not match.")
+    accept_second_factor(
+        db_factory,
+        settings,
+        username=username,
+        code=code,
+        now=now,
+    )
+    codes = [generate_recovery_code() for _ in range(RECOVERY_CODE_COUNT)]
+    with db_factory() as session:
+        user = StaffRepository(session).get_by_username(username)
+        if user is None or user.mfa_enabled_at is None:
+            raise AuthError("Account not found.")
+        MfaRepository(session).replace_recovery_codes(
+            user.id,
+            [hash_recovery_code(item) for item in codes],
+        )
+        session.commit()
+    logger.info("mfa recovery codes regenerated username=%s", username)
+    return codes
+
+
+def clear_user_mfa(db_factory: sessionmaker[Session], *, username: str) -> None:
+    with db_factory() as session:
+        user = StaffRepository(session).get_by_username(username)
+        if user is None:
+            raise AuthError("Account not found.")
+        MfaRepository(session).clear(user)
+        session.commit()
+    logger.info("mfa cleared by manager username=%s", username)

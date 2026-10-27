@@ -32,7 +32,7 @@ class AuthRateLimiter:
     async def hit(self, *, subject: str, bucket: str) -> None:
         if not subject.strip():
             raise ValueError("subject is required for rate limiting.")
-        if bucket not in {"login", "refresh"}:
+        if bucket not in {"login", "refresh", "forgot_password"}:
             raise ValueError(f"Unknown rate-limit bucket '{bucket}'.")
 
         minute_limit, daily_limit = _limits_for_bucket(self._settings, bucket)
@@ -90,6 +90,11 @@ def _limits_for_bucket(settings: Settings, bucket: str) -> tuple[int, int]:
         return settings.rate_limit_login_per_minute, settings.rate_limit_login_per_day
     if bucket == "refresh":
         return settings.rate_limit_refresh_per_minute, settings.rate_limit_refresh_per_day
+    if bucket == "forgot_password":
+        return (
+            settings.rate_limit_forgot_password_per_minute,
+            settings.rate_limit_forgot_password_per_day,
+        )
     raise ValueError(f"Unknown rate-limit bucket '{bucket}'.")
 
 

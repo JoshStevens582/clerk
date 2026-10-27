@@ -46,6 +46,8 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             )
         if "mfa_last_step" not in staff_columns:
             alters.append("ALTER TABLE staff_users ADD COLUMN mfa_last_step INTEGER")
+        if "email" not in staff_columns:
+            alters.append("ALTER TABLE staff_users ADD COLUMN email VARCHAR(320)")
         if alters:
             with engine.begin() as connection:
                 for statement in alters:

@@ -22,6 +22,11 @@ class StaffRepository:
         stmt = select(StaffUserRow).where(StaffUserRow.id == user_id)
         return self._session.scalar(stmt)
 
+    def get_by_email(self, email: str) -> StaffUserRow | None:
+        normalized = email.strip().lower()
+        stmt = select(StaffUserRow).where(StaffUserRow.email == normalized)
+        return self._session.scalar(stmt)
+
     def list_active(self) -> list[StaffUserRow]:
         stmt = (
             select(StaffUserRow)
@@ -37,12 +42,15 @@ class StaffRepository:
         password_hash: str,
         role: StaffRole,
         display_name: str | None,
+        email: str | None = None,
     ) -> StaffUserRow:
+        normalized_email = email.strip().lower() if email and email.strip() else None
         row = StaffUserRow(
             username=username.strip().lower(),
             password_hash=password_hash,
             role=role,
             display_name=display_name,
+            email=normalized_email,
             active=True,
         )
         self._session.add(row)

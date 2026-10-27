@@ -34,7 +34,12 @@ def staff_user_out(row: object) -> StaffUserOut:
     if not isinstance(row, StaffUserRow):
         raise TypeError("Expected StaffUserRow")
     role: StaffRole = "manager" if row.role == "manager" else "staff"
-    return StaffUserOut(username=row.username, role=role, display_name=row.display_name)
+    return StaffUserOut(
+        username=row.username,
+        role=role,
+        display_name=row.display_name,
+        email=row.email,
+    )
 
 
 def authenticate(

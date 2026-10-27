@@ -9,6 +9,7 @@ class StaffUserOut(BaseModel):
     username: str
     role: StaffRole
     display_name: str | None = None
+    email: str | None = None
 
 
 class CreateStaffIn(BaseModel):
@@ -16,3 +17,4 @@ class CreateStaffIn(BaseModel):
     password: str = Field(min_length=8, max_length=256)
     role: StaffRole = "staff"
     display_name: str | None = Field(default=None, max_length=128)
+    email: str | None = Field(default=None, max_length=320)

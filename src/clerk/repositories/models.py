@@ -18,6 +18,7 @@ class StaffUserRow(Base):
     password_hash: Mapped[str] = mapped_column(String(256))
     role: Mapped[str] = mapped_column(String(16), default="staff")
     display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
     active: Mapped[bool] = mapped_column(default=True)
     mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(
@@ -25,6 +26,20 @@ class StaffUserRow(Base):
         nullable=True,
     )
     mfa_last_step: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PasswordResetTokenRow(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("staff_users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
