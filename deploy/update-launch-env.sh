@@ -11,14 +11,12 @@ set_kv() {
   if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
     return 0
   fi
-  echo "${key}=${value}" >>"$ENV_FILE"
+  printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
 }
 
-# shellcheck disable=SC1091
-source "$ENV_FILE" || true
-
-if [[ -z "${RESEND_API_KEY:-}" && -n "${SMTP_PASSWORD:-}" ]]; then
-  set_kv "RESEND_API_KEY" "$SMTP_PASSWORD"
+smtp_password="$(grep -m1 '^SMTP_PASSWORD=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)"
+if [[ -n "$smtp_password" ]] && ! grep -q '^RESEND_API_KEY=' "$ENV_FILE" 2>/dev/null; then
+  set_kv "RESEND_API_KEY" "$smtp_password"
 fi
 
 set_kv "CLERK_INBOUND_ADDRESS" "clerk@customchatandautomation.co.za"
