@@ -41,19 +41,26 @@ def main(argv: list[str] | None = None) -> None:
     factory = session_factory(engine)
     role: StaffRole = "manager" if args.role == "manager" else "staff"
 
+    username = args.username.strip().lower()
     with factory() as session:
         repo = StaffRepository(session)
-        if repo.get_by_username(args.username) is not None:
-            print("Username already exists.", file=sys.stderr)
-            raise SystemExit(1)
+        existing = repo.get_by_username(username)
+        if existing is not None:
+            existing.password_hash = hash_password(password)
+            existing.active = True
+            if args.role == "manager" or existing.role == "manager":
+                existing.role = role if args.role == "manager" else existing.role
+            session.commit()
+            print(f"Updated password for staff user {username} ({existing.role}).")
+            return
         repo.create_user(
-            username=args.username,
+            username=username,
             password_hash=hash_password(password),
             role=role,
             display_name=args.display_name,
         )
         session.commit()
-    print(f"Created staff user {args.username.strip().lower()} ({role}).")
+    print(f"Created staff user {username} ({role}).")
 
 
 if __name__ == "__main__":
