@@ -218,6 +218,10 @@ export function SecurityPanel({
                 Download .txt
               </button>
             </div>
+            <p className="login-copy">
+              To continue: tap <strong>Copy all</strong> or <strong>Download .txt</strong>, tick the
+              box below, then press Continue. You do not need to reset your password again.
+            </p>
             <label className="recovery-ack">
               <input
                 type="checkbox"
@@ -234,10 +238,15 @@ export function SecurityPanel({
                 setRecoveryCodes(null);
                 setRecoveryAck(false);
                 setRecoveryExported(false);
+                setNotice("Authenticator is on. Next sign-in needs your password plus the app code.");
+                onBack();
               }}
             >
-              Continue
+              Continue to desk
             </button>
+            {!recoveryExported ? (
+              <p className="login-copy">Copy or download the codes to enable Continue.</p>
+            ) : null}
           </>
         ) : mfaSetup ? (
           <>

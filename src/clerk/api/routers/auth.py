@@ -354,7 +354,6 @@ async def mfa_confirm(
         )
     except (MfaRejected, MfaAuthError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    revoke_all_refresh_sessions(request.app.state.db_factory, user_id=staff.user_id)
     return MfaConfirmOut(recovery_codes=codes)
 
 
