@@ -42,6 +42,14 @@ export type StaffUser = {
   email?: string | null;
 };
 
+export type StaffAdminUser = {
+  username: string;
+  role: "staff" | "manager";
+  email: string | null;
+  mfa_enabled: boolean;
+  active: boolean;
+};
+
 export type Me = {
   user: StaffUser;
   mfa_enabled: boolean;
@@ -410,6 +418,10 @@ export async function regenerateRecoveryCodes(password: string, code: string): P
     body: JSON.stringify({ password, code }),
   });
   return parsed.recovery_codes;
+}
+
+export async function fetchStaffUsers(): Promise<StaffAdminUser[]> {
+  return api<StaffAdminUser[]>("/api/staff/users");
 }
 
 export async function clearStaffMfa(username: string): Promise<void> {

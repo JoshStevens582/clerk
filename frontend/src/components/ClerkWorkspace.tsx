@@ -17,6 +17,7 @@ type ClerkWorkspaceProps = {
   onApprove: (taskId: number) => void;
   onReject: (taskId: number) => void;
   onOpenSecurity: () => void;
+  onOpenPeople?: () => void;
   onLogout: () => void;
 };
 
@@ -35,6 +36,7 @@ export function ClerkWorkspace({
   onApprove,
   onReject,
   onOpenSecurity,
+  onOpenPeople,
   onLogout,
 }: ClerkWorkspaceProps) {
   const pending = queue.length;
@@ -89,6 +91,11 @@ export function ClerkWorkspace({
             );
           })}
         </div>
+        {onOpenPeople ? (
+          <button type="button" className="new-chat" onClick={onOpenPeople}>
+            People
+          </button>
+        ) : null}
         <button type="button" className="new-chat" onClick={onOpenSecurity}>
           Security{mfaEnabled ? " · MFA on" : ""}
         </button>

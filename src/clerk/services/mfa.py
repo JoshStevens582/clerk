@@ -266,11 +266,24 @@ def regenerate_recovery_codes(
     return codes
 
 
-def clear_user_mfa(db_factory: sessionmaker[Session], *, username: str) -> None:
+def clear_user_mfa(
+    db_factory: sessionmaker[Session],
+    *,
+    actor_username: str,
+    username: str,
+) -> None:
+    """Turn authenticator off for someone else. The actor uses Security for their own."""
+    target = username.strip().lower()
+    if not target:
+        raise AuthError("Account not found.")
+    if actor_username.strip().lower() == target:
+        raise AuthError(
+            "Turn off your own authenticator from Security, with your password and a code."
+        )
     with db_factory() as session:
-        user = StaffRepository(session).get_by_username(username)
+        user = StaffRepository(session).get_by_username(target)
         if user is None:
             raise AuthError("Account not found.")
         MfaRepository(session).clear(user)
         session.commit()
-    logger.info("mfa cleared by manager username=%s", username)
+    logger.info("mfa cleared by manager actor=%s target=%s", actor_username, target)

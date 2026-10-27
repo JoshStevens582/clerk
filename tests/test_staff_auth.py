@@ -20,6 +20,17 @@ def test_manager_can_list_staff_users(
     assert names == {"owner", "reception"}
 
 
+def test_manager_can_clear_another_users_mfa(
+    client: TestClient,
+    owner_auth: dict[str, str],
+) -> None:
+    self_clear = client.post("/api/staff/users/owner/mfa/reset", headers=owner_auth)
+    assert self_clear.status_code == 400
+
+    cleared = client.post("/api/staff/users/reception/mfa/reset", headers=owner_auth)
+    assert cleared.status_code == 200
+
+
 def test_manager_can_create_a_staff_user(client: TestClient, owner_auth: dict[str, str]) -> None:
     created = client.post(
         "/api/staff/users",

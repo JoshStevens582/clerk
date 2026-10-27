@@ -12,6 +12,14 @@ class StaffUserOut(BaseModel):
     email: str | None = None
 
 
+class StaffAdminOut(BaseModel):
+    username: str
+    role: StaffRole
+    email: str | None = None
+    mfa_enabled: bool = False
+    active: bool = True
+
+
 class CreateStaffIn(BaseModel):
     username: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9_-]+$")
     password: str = Field(min_length=8, max_length=256)

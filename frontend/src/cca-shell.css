@@ -575,3 +575,57 @@ button.ghost {
   font-size: 13px;
   color: var(--muted);
 }
+
+.people-panel-page {
+  max-width: 720px;
+  margin: 24px auto;
+  padding: 24px;
+}
+
+.people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.people-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--bg-elev);
+}
+
+.people-row strong {
+  display: block;
+}
+
+.people-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.people-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.people-actions .pill {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.people-actions .pill.ok {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}

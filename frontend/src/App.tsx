@@ -19,6 +19,7 @@ import {
 } from "./api";
 import { AuthScreen } from "./components/AuthScreen";
 import { ClerkWorkspace } from "./components/ClerkWorkspace";
+import { PeoplePanel } from "./components/PeoplePanel";
 import { SecurityPanel } from "./components/SecurityPanel";
 import type { InboxMessage } from "./inbox";
 
@@ -26,6 +27,7 @@ export function App() {
   const [user, setUser] = useState<StaffUser | null>(null);
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -63,6 +65,7 @@ export function App() {
     setUser(null);
     setMfaEnabled(false);
     setSecurityOpen(false);
+    setPeopleOpen(false);
     setQueue([]);
     setOutbox([]);
     setLastResult(null);
@@ -160,6 +163,15 @@ export function App() {
     );
   }
 
+  if (peopleOpen && user.role === "manager") {
+    return (
+      <PeoplePanel
+        signedInUsername={user.username}
+        onBack={() => setPeopleOpen(false)}
+      />
+    );
+  }
+
   return (
     <ClerkWorkspace
       user={user}
@@ -175,7 +187,18 @@ export function App() {
       onSelectInbox={(message) => void handleSelectInbox(message)}
       onApprove={handleApprove}
       onReject={handleReject}
-      onOpenSecurity={() => setSecurityOpen(true)}
+      onOpenSecurity={() => {
+        setPeopleOpen(false);
+        setSecurityOpen(true);
+      }}
+      onOpenPeople={
+        user.role === "manager"
+          ? () => {
+              setSecurityOpen(false);
+              setPeopleOpen(true);
+            }
+          : undefined
+      }
       onLogout={() => void handleLogout()}
     />
   );
