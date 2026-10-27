@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   createInboundMessage,
@@ -11,6 +11,8 @@ import {
   type StaffUser,
 } from "../api";
 import { kindLabel } from "../labels";
+
+type MobilePane = "inbox" | "desk" | "sent";
 
 type ClerkWorkspaceProps = {
   user: StaffUser;
@@ -63,6 +65,14 @@ export function ClerkWorkspace({
     channel: "Email",
   });
   const [inboundError, setInboundError] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<MobilePane>("desk");
+  const [sentCollapsed, setSentCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (selected) {
+      setMobilePane("desk");
+    }
+  }, [selected]);
 
   async function onSubmitInbound(event: React.FormEvent) {
     event.preventDefault();
@@ -77,8 +87,42 @@ export function ClerkWorkspace({
     }
   }
 
+  const appClass = [
+    "app",
+    sentCollapsed ? "app--sent-collapsed" : "",
+    `app--mobile-${mobilePane}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="app">
+    <div className={appClass}>
+      <nav className="mobile-pane-tabs" aria-label="Workspace sections">
+        <button
+          type="button"
+          className={mobilePane === "inbox" ? "active" : ""}
+          onClick={() => setMobilePane("inbox")}
+        >
+          Inbox
+          {inbox.length > 0 ? ` (${inbox.length})` : ""}
+        </button>
+        <button
+          type="button"
+          className={mobilePane === "desk" ? "active" : ""}
+          onClick={() => setMobilePane("desk")}
+        >
+          Desk
+          {pending > 0 ? ` (${pending})` : ""}
+        </button>
+        <button
+          type="button"
+          className={mobilePane === "sent" ? "active" : ""}
+          onClick={() => setMobilePane("sent")}
+        >
+          Sent
+          {outbox.length > 0 ? ` (${outbox.length})` : ""}
+        </button>
+      </nav>
       <aside className="panel sidebar">
         <div className="brand">
           <strong>CLERK</strong>
@@ -395,7 +439,18 @@ export function ClerkWorkspace({
       </main>
 
       <aside className="panel sources">
-        <p className="section-label">Sent</p>
+        <div className="pane-head">
+          <p className="section-label">Sent</p>
+          <button
+            type="button"
+            className="pane-collapse"
+            aria-label={sentCollapsed ? "Show sent panel" : "Hide sent panel"}
+            aria-expanded={!sentCollapsed}
+            onClick={() => setSentCollapsed((open) => !open)}
+          >
+            {sentCollapsed ? "Show" : "Hide"}
+          </button>
+        </div>
         {outbox.length === 0 ? (
           <p className="muted-copy">Auto-replies and approved mail show here.</p>
         ) : (
