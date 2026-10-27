@@ -22,4 +22,4 @@ fi
 set_kv "CLERK_INBOUND_ADDRESS" "clerk@customchatandautomation.co.za"
 set_kv "CLERK_SEED_DEMO_INBOX" "false"
 
-echo "Launch env updated. Set RESEND_WEBHOOK_SECRET after adding the Resend webhook (see docs/launch-inbound.md)."
+echo "Launch env updated. Run: bash deploy/finish-launch.sh && docker compose -f docker-compose.yml -f deploy/compose.edge.yml up -d api"

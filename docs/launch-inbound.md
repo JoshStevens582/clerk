@@ -1,65 +1,48 @@
-# Launch: automatic patient email (Resend)
+# Launch: automatic patient email
 
-Clerk is launch-ready when **outbound** (SMTP) and **inbound** (Resend receiving) are configured.
+Production target: **`clerk@customchatandautomation.co.za`** → Resend → Clerk → approve → SMTP reply.
 
-## 1. Outbound (already on VPS if Atlas sends mail)
+## Server (VPS `/opt/clerk/.env`)
 
-In `/opt/clerk/.env`:
+| Variable | Purpose |
+|----------|---------|
+| `SMTP_*` | Outbound via Resend (`smtp.resend.com`) |
+| `RESEND_API_KEY` | Same value as `SMTP_PASSWORD`; must be **Full access** |
+| `RESEND_WEBHOOK_SECRET` | From Resend webhook (`whsec_…`) |
+| `CLERK_INBOUND_ADDRESS` | `clerk@customchatandautomation.co.za` |
+| `CLERK_SEED_DEMO_INBOX` | `false` in production |
+| `SMTP_FROM` | e.g. `Cape Town Physio <noreply@customchatandautomation.co.za>` |
 
-- `SMTP_HOST=smtp.resend.com`
-- `SMTP_USERNAME=resend`
-- `SMTP_PASSWORD=` your Resend API key (`re_…`)
-- `SMTP_FROM=` e.g. `Cape Town Physio <noreply@customchatandautomation.co.za>`
+Register webhook + update `.env` (key read from file, not echoed):
 
-Desk shows **SMTP ready**.
-
-## 2. Inbound address
-
-Choose an address on your verified domain, e.g.:
-
-`clerk@customchatandautomation.co.za`
-
-Set in `/opt/clerk/.env`:
-
-```env
-CLERK_INBOUND_ADDRESS=clerk@customchatandautomation.co.za
-RESEND_API_KEY=re_…   # same as SMTP password if using Resend
-CLERK_SEED_DEMO_INBOX=false   # optional: hide demo samples in production
+```bash
+cd /opt/clerk
+bash deploy/finish-launch.sh
+docker compose -f docker-compose.yml -f deploy/compose.edge.yml up -d api
 ```
 
-Forward or MX-route practice mail to this address (see Resend **Receiving** docs).
+Clerk **polls** Resend ~every 45s when the API key has full access; the webhook is optional but recommended.
 
-## 3. Resend dashboard
+## Domain mail (domains.co.za)
 
-1. **Domains** → enable **Receiving** for `customchatandautomation.co.za` (MX records Resend provides).
-2. **Webhooks** → Add webhook:
-   - URL: `https://agent.customchatandautomation.co.za/api/hooks/resend`
-   - Event: **`email.received`**
-   - Copy the **signing secret** (`whsec_…`) into `/opt/clerk/.env`:
+Root MX is **TLD-MX** (`mx1.tld-mx.com`), not Resend. Forward into Resend:
 
-```env
-RESEND_WEBHOOK_SECRET=whsec_…
-```
+1. **domains.co.za** → **Manage Services** → **Email Only Hosting** → **customchatandautomation.co.za** → **Login to cPanel**
+2. **Email** → **Forwarders** → **Add Forwarder**
+3. Address: `clerk` → domain `customchatandautomation.co.za` → forward to your **`@….resend.app`** (Resend → Emails → Receiving → ⋯ → Receiving address)
+4. Test: Gmail → `clerk@customchatandautomation.co.za` → Resend **Receiving** → Clerk desk
 
-3. Restart API:  
-   `docker compose -f docker-compose.yml -f deploy/compose.edge.yml up -d api`
+## Health
 
-4. Test: `GET https://agent.customchatandautomation.co.za/api/hooks/resend/health` → OK.
+`GET /api/health`:
 
-Send a test email **to** `clerk@…`. Within a minute:
+- `inbound_automation_ready` — full-access key + inbound address
+- `inbound_resend_api_full_access` — key can list received mail
+- `inbound_webhook_configured` — webhook secret set
+- `inbound_setup_note` — plain-English fix hint when something is missing
 
-- Desk pill **inbound automation** should be ready.
-- **Needs your approval** or **Sent** updates without using **Add inbound message**.
+## Manual fallback
 
-## 4. Staff workflow (production)
+`POST /api/hooks/inbound` with header `X-Clerk-Inbound-Secret` (see `.env.example`).
 
-1. Sign in at `https://agent.customchatandautomation.co.za`
-2. Patient emails `clerk@…` → Clerk runs automatically.
-3. **Needs your approval** (left) → **Approve** or **Reject**.
-4. **Sent** (right) → **Delivered via SMTP**.
-
-**Add inbound message** = manual fallback only.
-
-## 5. OpenAI
-
-Set `OPENAI_API_KEY` in `/opt/clerk/.env` for real patient wording (not demo `sample_id` routes). Demo samples work without it.
+Secret rotation: [rotate-secrets.md](rotate-secrets.md).

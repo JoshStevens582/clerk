@@ -13,6 +13,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY src ./src
+COPY scripts ./scripts
 COPY pages ./pages
 RUN uv sync --frozen --no-dev
 

@@ -47,6 +47,9 @@ export type HealthStatus = {
   openai_configured: boolean;
   smtp_configured: boolean;
   inbound_automation_ready: boolean;
+  inbound_resend_api_full_access: boolean;
+  inbound_webhook_configured: boolean;
+  inbound_setup_note: string;
   inbound_address: string;
   pages_dir: string;
   pending_count: number;

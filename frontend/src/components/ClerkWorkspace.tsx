@@ -87,8 +87,12 @@ export function ClerkWorkspace({
         <p className="workspace-name">Cape Town Physio</p>
         {health?.inbound_address ? (
           <p className="muted-copy inbox-hint">
-            Patient mail to <strong>{health.inbound_address}</strong> lands here automatically
-            {health.inbound_automation_ready ? "" : " (finish Resend receiving setup in docs)"}.
+            Patient address: <strong>{health.inbound_address}</strong>
+            {health.inbound_automation_ready
+              ? " — Clerk pulls mail from Resend automatically."
+              : health.inbound_setup_note
+                ? ` — ${health.inbound_setup_note}`
+                : " — inbound not configured yet."}
           </p>
         ) : null}
         <p className="section-label">
@@ -114,6 +118,21 @@ export function ClerkWorkspace({
           </span>
           <span className={`pill ${pending > 0 ? "warn" : "ok"}`}>
             {pending} awaiting approval
+          </span>
+          <span
+            className={`pill ${
+              health === null
+                ? ""
+                : health.inbound_automation_ready
+                  ? "ok"
+                  : "warn"
+            }`}
+          >
+            {health === null
+              ? "Inbound…"
+              : health.inbound_automation_ready
+                ? "Inbound automation on"
+                : "Inbound not live"}
           </span>
         </div>
         {queue.length > 0 ? (

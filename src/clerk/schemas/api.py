@@ -81,6 +81,9 @@ class HealthOut(BaseModel):
     openai_configured: bool
     smtp_configured: bool
     inbound_automation_ready: bool
+    inbound_resend_api_full_access: bool
+    inbound_webhook_configured: bool
+    inbound_setup_note: str
     inbound_address: str
     pages_dir: str
     pending_count: int

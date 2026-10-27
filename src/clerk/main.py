@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -23,6 +25,8 @@ from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
 from clerk.services.rate_limit import InMemoryRateLimiter
 from clerk.services.redis_client import connect_redis
+from clerk.services.resend_inbound import ResendApiAccess, probe_resend_api_access_sync
+from clerk.services.resend_poll import resend_inbound_poll_loop
 from clerk.services.staff_auth import bootstrap_staff_users
 from clerk.services.workflow import ClerkWorkflow
 
@@ -63,10 +67,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.auth_rate_limiter = auth_rate_limiter
     app.state.login_lockout = login_lockout
     app.state.redis_client = redis_client
+    app.state.resend_api_access = probe_resend_api_access_sync(settings)
+    poll_task: asyncio.Task[None] | None = None
+    if app.state.resend_api_access == ResendApiAccess.FULL:
+        poll_task = asyncio.create_task(resend_inbound_poll_loop(app))
     bootstrap_staff_users(settings, db_factory)
     if settings.clerk_seed_demo_inbox:
         seed_demo_inbox(db_factory)
     yield
+    if poll_task is not None:
+        poll_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await poll_task
     if redis_client is not None:
         await redis_client.aclose()
 
