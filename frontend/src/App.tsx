@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   approveTask,
+  completeMfaLogin,
   fetchHealth,
   fetchOutbox,
   fetchQueue,
@@ -10,6 +11,7 @@ import {
   logout,
   type StaffUser,
   rejectTask,
+  startSessionMaintenance,
   submitMessage,
   type HealthStatus,
   type MessageResult,
@@ -24,6 +26,8 @@ export function App() {
   const [user, setUser] = useState<StaffUser | null>(null);
   const [username, setUsername] = useState("reception");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -44,8 +48,21 @@ export function App() {
     event.preventDefault();
     setError(null);
     try {
-      const signedIn = await login(username, password);
-      setUser(signedIn);
+      if (mfaToken) {
+        const signedIn = await completeMfaLogin(mfaToken, mfaCode);
+        setUser(signedIn);
+        setMfaToken(null);
+        setMfaCode("");
+        await refresh();
+        return;
+      }
+      const result = await login(username, password);
+      if (result.mfaRequired && result.mfaToken) {
+        setMfaToken(result.mfaToken);
+        setPassword("");
+        return;
+      }
+      setUser(result.user);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -55,6 +72,7 @@ export function App() {
   async function handleLogout() {
     await logout();
     setUser(null);
+    setMfaToken(null);
     setQueue([]);
     setOutbox([]);
     setLastResult(null);
@@ -118,6 +136,17 @@ export function App() {
     if (!user) {
       return;
     }
+    return startSessionMaintenance(() => {
+      setUser(null);
+      setQueue([]);
+      setOutbox([]);
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
     const timer = window.setInterval(() => {
       void refresh();
     }, 30_000);
@@ -129,10 +158,18 @@ export function App() {
       <LoginScreen
         username={username}
         password={password}
+        mfaCode={mfaCode}
+        mfaStep={Boolean(mfaToken)}
         error={error}
         onUsernameChange={setUsername}
         onPasswordChange={setPassword}
+        onMfaCodeChange={setMfaCode}
         onSubmit={handleLogin}
+        onBackFromMfa={() => {
+          setMfaToken(null);
+          setMfaCode("");
+          setError(null);
+        }}
       />
     );
   }

@@ -41,33 +41,293 @@ export type StaffUser = {
   display_name: string | null;
 };
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+export type LoginResult = {
+  user: StaffUser;
+  mfaRequired: boolean;
+  mfaToken: string | null;
+};
+
+const TOKEN_KEY = "clerk_access_token";
+const REFRESH_KEY = "clerk_refresh_token";
+const REFRESH_LEAD_SECONDS = 120;
+
+let refreshInFlight: Promise<boolean> | null = null;
+let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let onSessionLost: (() => void) | null = null;
+
+function clearProactiveRefreshTimer(): void {
+  if (proactiveRefreshTimer !== null) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
+}
+
+function accessTokenExpiresAtMs(accessToken: string): number | null {
+  const parts = accessToken.split(".");
+  if (parts.length !== 3) {
+    return null;
+  }
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(base64)) as { exp?: unknown };
+    if (typeof payload.exp === "number") {
+      return payload.exp * 1000;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function accessTokenNeedsRefresh(accessToken: string): boolean {
+  const expMs = accessTokenExpiresAtMs(accessToken);
+  if (expMs === null) {
+    return true;
+  }
+  return expMs - Date.now() <= REFRESH_LEAD_SECONDS * 1000;
+}
+
+function scheduleProactiveRefresh(): void {
+  clearProactiveRefreshTimer();
+  const accessToken = sessionStorage.getItem(TOKEN_KEY);
+  if (!accessToken || !sessionStorage.getItem(REFRESH_KEY)) {
+    return;
+  }
+  const expMs = accessTokenExpiresAtMs(accessToken);
+  if (expMs === null) {
+    return;
+  }
+  const delayMs = Math.max(expMs - Date.now() - REFRESH_LEAD_SECONDS * 1000, 5_000);
+  proactiveRefreshTimer = setTimeout(() => {
+    void rotateRefreshCredential(true);
+  }, delayMs);
+}
+
+function failLocalSession(): void {
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
+  clearProactiveRefreshTimer();
+  onSessionLost?.();
+}
+
+async function rotateRefreshCredential(scheduleNext: boolean): Promise<boolean> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+  const rawRefresh = sessionStorage.getItem(REFRESH_KEY);
+  if (!rawRefresh) {
+    return false;
+  }
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rawRefresh }),
+      });
+      if (!response.ok) {
+        return false;
+      }
+      const parsed = (await response.json()) as {
+        access_token?: string | null;
+        refresh_token?: string | null;
+      };
+      if (!parsed.access_token) {
+        return false;
+      }
+      storeSessionTokens(parsed.access_token, parsed.refresh_token ?? rawRefresh);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  const ok = await refreshInFlight;
+  if (!ok) {
+    failLocalSession();
+    return false;
+  }
+  if (scheduleNext) {
+    scheduleProactiveRefresh();
+  }
+  return true;
+}
+
+async function ensureFreshAccessToken(): Promise<boolean> {
+  const accessToken = sessionStorage.getItem(TOKEN_KEY);
+  if (!accessToken) {
+    return false;
+  }
+  if (!accessTokenNeedsRefresh(accessToken)) {
+    return true;
+  }
+  return rotateRefreshCredential(true);
+}
+
+function authHeaders(extra?: HeadersInit): Headers {
+  const headers = new Headers(extra);
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  headers.set("Content-Type", "application/json");
+  return headers;
+}
+
+async function authorizedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (sessionStorage.getItem(TOKEN_KEY)) {
+    const fresh = await ensureFreshAccessToken();
+    if (!fresh) {
+      return new Response(JSON.stringify({ detail: "Not authenticated." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+  let response = await fetch(input, {
     ...init,
+    headers: authHeaders(init?.headers),
   });
+  if (response.status === 401 && sessionStorage.getItem(REFRESH_KEY)) {
+    const refreshed = await rotateRefreshCredential(true);
+    if (refreshed) {
+      response = await fetch(input, {
+        ...init,
+        headers: authHeaders(init?.headers),
+      });
+    }
+  }
+  return response;
+}
+
+function storeSessionTokens(accessToken: string, refreshToken: string | null | undefined): void {
+  sessionStorage.setItem(TOKEN_KEY, accessToken);
+  if (refreshToken) {
+    sessionStorage.setItem(REFRESH_KEY, refreshToken);
+  } else {
+    sessionStorage.removeItem(REFRESH_KEY);
+  }
+  scheduleProactiveRefresh();
+}
+
+export function hasSession(): boolean {
+  return Boolean(sessionStorage.getItem(TOKEN_KEY));
+}
+
+export function startSessionMaintenance(onLost: () => void): () => void {
+  onSessionLost = onLost;
+  scheduleProactiveRefresh();
+  void ensureFreshAccessToken();
+  return () => {
+    onSessionLost = null;
+    clearProactiveRefreshTimer();
+  };
+}
+
+function formatApiDetail(detail: unknown): string {
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (detail && typeof detail === "object" && "detail" in detail) {
+    return formatApiDetail((detail as { detail: unknown }).detail);
+  }
+  return "Request failed";
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await authorizedFetch(path, init);
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || response.statusText);
+    let message = response.statusText;
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      message = formatApiDetail(body.detail ?? body);
+    } catch {
+      message = await response.text();
+    }
+    throw new Error(message || response.statusText);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return (await response.json()) as T;
 }
 
-export async function login(username: string, password: string): Promise<StaffUser> {
-  const result = await api<{ user: StaffUser }>("/api/auth/login", {
+type TokenResponse = {
+  access_token: string | null;
+  refresh_token: string | null;
+  username: string;
+  role: "staff" | "manager";
+  mfa_required: boolean;
+  mfa_token: string | null;
+};
+
+function userFromToken(parsed: TokenResponse): StaffUser {
+  return { username: parsed.username, role: parsed.role, display_name: null };
+}
+
+export async function login(username: string, password: string): Promise<LoginResult> {
+  const parsed = await api<TokenResponse>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
-  return result.user;
+  if (parsed.mfa_required) {
+    return {
+      user: userFromToken(parsed),
+      mfaRequired: true,
+      mfaToken: parsed.mfa_token,
+    };
+  }
+  if (!parsed.access_token || !parsed.refresh_token) {
+    throw new Error("Login did not return session tokens.");
+  }
+  storeSessionTokens(parsed.access_token, parsed.refresh_token);
+  return {
+    user: userFromToken(parsed),
+    mfaRequired: false,
+    mfaToken: null,
+  };
+}
+
+export async function completeMfaLogin(mfaToken: string, code: string): Promise<StaffUser> {
+  const parsed = await api<TokenResponse>("/api/auth/login/mfa", {
+    method: "POST",
+    body: JSON.stringify({ mfa_token: mfaToken, code }),
+  });
+  if (!parsed.access_token || !parsed.refresh_token) {
+    throw new Error("Sign-in did not return session tokens.");
+  }
+  storeSessionTokens(parsed.access_token, parsed.refresh_token);
+  return userFromToken(parsed);
 }
 
 export async function fetchSession(): Promise<StaffUser | null> {
-  return api<StaffUser | null>("/api/auth/session");
+  if (!hasSession()) {
+    return null;
+  }
+  try {
+    const me = await api<{ user: StaffUser }>("/api/auth/me");
+    return me.user;
+  } catch {
+    failLocalSession();
+    return null;
+  }
 }
 
 export async function logout(): Promise<void> {
-  await api("/api/auth/logout", { method: "POST" });
+  const refresh = sessionStorage.getItem(REFRESH_KEY);
+  if (refresh) {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
+    } catch {
+      // still clear local session
+    }
+  }
+  failLocalSession();
 }
 
 export async function fetchHealth(): Promise<HealthStatus> {

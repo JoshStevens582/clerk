@@ -4,9 +4,12 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "bcrypt>=4.2.0",
+    "cryptography>=44.0.0",
     "fastapi>=0.116.0",
-    "itsdangerous>=2.2.0",
     "openai>=3.8.0",
+    "PyJWT>=2.10.0",
+    "redis>=5.2.0",
+    "segno>=1.6.0",
     "pydantic>=2.13.5",
     "pydantic-ai>=0.8.0",
     "pydantic-settings>=2.10.0",
@@ -58,5 +61,5 @@ packages = ["clerk"]
 exclude = ["tests/"]
 
 [[tool.mypy.overrides]]
-module = ["pydantic_ai.*"]
+module = ["pydantic_ai.*", "jwt.*", "segno.*"]
 ignore_missing_imports = true

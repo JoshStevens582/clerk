@@ -1,6 +1,19 @@
 # Clerk: web (Caddy + React) -> api (FastAPI + SQLite).
 # Local smoke test: ports 8090/8444 on web.
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: clerk-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - clerk-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build: .
     container_name: clerk-api
@@ -8,6 +21,8 @@ services:
     env_file: .env
     environment:
       CORS_ORIGINS: ""
+      REDIS_URL: redis://redis:6379/1
+      REDIS_REQUIRED: "true"
     volumes:
       - clerk-data:/app/data
     healthcheck:
@@ -22,6 +37,9 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 8
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - default
       - cca-edge
@@ -56,5 +74,6 @@ networks:
 
 volumes:
   clerk-data:
+  clerk-redis-data:
   caddy-data:
   caddy-config:

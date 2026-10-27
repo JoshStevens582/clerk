@@ -27,9 +27,9 @@ uv run uvicorn clerk.main:app --reload --port 8789 --app-dir src
 cd frontend && npm install && npm run dev
 ```
 
-Open `http://localhost:5175`. **Staff sign-in (v2):** username + password. Local demo accounts from `CLERK_BOOTSTRAP_STAFF` in `.env` (default **owner** / **reception** with passwords in `.env.example`).
+Open `http://localhost:5175`. **Staff sign-in** uses Atlas-style security: short-lived JWT access tokens, refresh rotation, Redis login rate limits and account lockout, optional authenticator MFA, and bcrypt passwords. Local demo accounts come from `CLERK_BOOTSTRAP_STAFF` in `.env`. Set `CLERK_AUTH_SECRET` to a random string (≥ 32 bytes) before production; start Redis for lockout and auth rate limits (`REDIS_URL`, or `docker compose up`).
 
-Managers can add users: `uv run python -m clerk.staff_cli newname --role staff` or `POST /api/staff/users` while signed in as a manager.
+Managers can add users: `uv run python -m clerk.staff_cli newname --role staff` or `POST /api/staff/users` while signed in as a manager. Managers should turn on MFA under `/api/auth/mfa/*` after sign-in (UI coming); API matches Atlas.
 
 ## Tests and quality
 

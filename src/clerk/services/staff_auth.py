@@ -13,6 +13,7 @@ from clerk.schemas.staff import StaffRole, StaffUserOut
 logger = logging.getLogger("clerk.staff")
 
 _USERNAME_RE = re.compile(r"^[a-z0-9_-]+$")
+_DUMMY_HASH = bcrypt.hashpw(b"not-a-real-password", bcrypt.gensalt()).decode("utf-8")
 
 
 def hash_password(password: str) -> str:
@@ -45,6 +46,7 @@ def authenticate(
     repo = StaffRepository(session)
     row = repo.get_by_username(username)
     if row is None or not row.active:
+        verify_password(password, _DUMMY_HASH)
         return None
     if not verify_password(password, row.password_hash):
         return None

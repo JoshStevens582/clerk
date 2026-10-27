@@ -18,6 +18,10 @@ class StaffRepository:
         stmt = select(StaffUserRow).where(StaffUserRow.username == normalized)
         return self._session.scalar(stmt)
 
+    def get_by_id(self, user_id: int) -> StaffUserRow | None:
+        stmt = select(StaffUserRow).where(StaffUserRow.id == user_id)
+        return self._session.scalar(stmt)
+
     def list_active(self) -> list[StaffUserRow]:
         stmt = (
             select(StaffUserRow)

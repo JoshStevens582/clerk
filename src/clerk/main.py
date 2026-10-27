@@ -5,19 +5,21 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
 from clerk.api.routers.auth import router as auth_router
 from clerk.api.routers.health import router as health_router
 from clerk.api.routers.samples import router as samples_router
 from clerk.api.routers.staff import router as staff_router
 from clerk.api.routers.tasks import router as tasks_router
-from clerk.config import load_settings
+from clerk.config import load_settings, require_secure_auth_secret
 from clerk.repositories.db import create_db_engine, init_db, session_factory
 from clerk.services.agent import ClerkAgentService
+from clerk.services.auth_rate_limit import AuthRateLimiter
+from clerk.services.login_lockout import LoginLockout
 from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
 from clerk.services.rate_limit import InMemoryRateLimiter
+from clerk.services.redis_client import connect_redis
 from clerk.services.staff_auth import bootstrap_staff_users
 from clerk.services.workflow import ClerkWorkflow
 
@@ -26,6 +28,7 @@ from clerk.services.workflow import ClerkWorkflow
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = load_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
+    require_secure_auth_secret(settings)
     Path("data").mkdir(exist_ok=True)
 
     engine = create_db_engine(settings.database_url)
@@ -37,26 +40,35 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     workflow = ClerkWorkflow(agent_service, policy, db_factory)
     rate_limiter = InMemoryRateLimiter(settings, db_factory)
 
+    redis_client = await connect_redis(settings)
+    auth_rate_limiter = (
+        AuthRateLimiter(redis_client, settings)
+        if redis_client is not None and settings.rate_limit_enabled
+        else None
+    )
+    login_lockout = (
+        LoginLockout(redis_client, settings)
+        if redis_client is not None and settings.login_lockout_enabled
+        else None
+    )
+
     app.state.settings = settings
     app.state.db_factory = db_factory
     app.state.page_store = page_store
     app.state.workflow = workflow
     app.state.rate_limiter = rate_limiter
+    app.state.auth_rate_limiter = auth_rate_limiter
+    app.state.login_lockout = login_lockout
+    app.state.redis_client = redis_client
     bootstrap_staff_users(settings, db_factory)
     yield
+    if redis_client is not None:
+        await redis_client.aclose()
 
 
 def create_app() -> FastAPI:
     settings = load_settings()
     app = FastAPI(title="Clerk", lifespan=lifespan)
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=settings.session_secret,
-        session_cookie=settings.session_cookie_name,
-        max_age=settings.session_max_age_seconds,
-        same_site="lax",
-        https_only=False,
-    )
     if settings.cors_origin_list:
         app.add_middleware(
             CORSMiddleware,
