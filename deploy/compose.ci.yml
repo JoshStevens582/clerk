@@ -1,0 +1,14 @@
+services:
+  api:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8789/api/ready')",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 10

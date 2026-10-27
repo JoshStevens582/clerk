@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Custom Chat and Automation">
+  <path
+    d="M14 8h20a4 4 0 0 1 4 4v14.5H28.2c-1.1 0-2.1.6-2.6 1.6l-1.2 2.4H14a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4Z"
+    fill="currentColor"
+  />
+  <path
+    d="M10 12a4 4 0 0 1 4-4h2v26h-2a4 4 0 0 1-4-4V12Z"
+    fill="currentColor"
+    opacity="0.75"
+  />
+  <rect x="18" y="14" width="16" height="2" rx="1" fill="#fff" opacity="0.35" />
+  <rect x="18" y="19" width="12" height="2.5" rx="1.25" fill="#fff" />
+  <rect x="18" y="24.5" width="14" height="2" rx="1" fill="#fff" opacity="0.35" />
+  <path
+    d="M22.5 30.5h3c2.2 0 4 1.8 4 4v1.5c0 .8-.7 1.5-1.5 1.5h-8c-.8 0-1.5-.7-1.5-1.5V34.5c0-2.2 1.8-4 4-4Z"
+    fill="currentColor"
+    opacity="0.55"
+  />
+  <text
+    x="26"
+    y="38.2"
+    text-anchor="middle"
+    fill="#fff"
+    font-family="'DM Sans', system-ui, sans-serif"
+    font-size="5.5"
+    font-weight="700"
+    letter-spacing="0.08em"
+  >
+    CCA
+  </text>
+</svg>

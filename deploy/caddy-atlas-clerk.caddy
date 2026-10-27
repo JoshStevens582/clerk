@@ -1,0 +1,24 @@
+# Append to Atlas deploy/Caddyfile (separate site block).
+# Requires clerk-api and clerk-web on Docker network cca-edge.
+
+agent.customchatandautomation.co.za {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy clerk-api:8789 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy clerk-web:80
+	}
+}
