@@ -527,6 +527,11 @@ export async function fetchInbox(): Promise<InboxMessage[]> {
   return rows.map(mapInbound);
 }
 
+export async function resetDemoInbox(): Promise<string> {
+  const parsed = await api<{ message: string }>("/api/inbox/reset-demo", { method: "POST" });
+  return parsed.message;
+}
+
 export async function createInboundMessage(payload: {
   from_name: string;
   from_email: string;

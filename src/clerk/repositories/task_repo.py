@@ -7,6 +7,21 @@ from sqlalchemy.orm import Session
 from clerk.repositories.models import OutboxRow, TaskRow
 from clerk.schemas.agent import PolicyOutcome, PolicyOutcomeKind, ProposalKind, QueueStatus
 
+_PENDING_BOOKING_DISCLAIMER = "Time not held until approved."
+_APPROVED_BOOKING_HELD = "This appointment time is now held for you."
+
+
+def outbound_body_after_approval(*, kind: str, draft_body: str) -> str:
+    """Patient-facing text after a manager approves (draft is written for the queue state)."""
+    if kind != "booking_draft":
+        return draft_body
+    if _PENDING_BOOKING_DISCLAIMER in draft_body:
+        return draft_body.replace(_PENDING_BOOKING_DISCLAIMER, _APPROVED_BOOKING_HELD)
+    trimmed = draft_body.rstrip()
+    if not trimmed:
+        return _APPROVED_BOOKING_HELD
+    return f"{trimmed}\n\n{_APPROVED_BOOKING_HELD}"
+
 
 class TaskRepository:
     def __init__(self, session: Session) -> None:
@@ -78,10 +93,15 @@ class TaskRepository:
         row.slot_held = True
         row.resolved_at = datetime.now(tz=UTC)
         row.resolved_by_username = resolved_by_username
+        send_body = outbound_body_after_approval(
+            kind=row.kind,
+            draft_body=row.draft_body or "",
+        )
+        row.draft_body = send_body
         self._add_outbox(
             kind=row.kind,
             subject=row.draft_subject,
-            body=row.draft_body or "",
+            body=send_body,
             source_task_id=row.id,
             to_email=row.reply_to_email,
         )

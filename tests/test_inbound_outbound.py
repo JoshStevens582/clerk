@@ -89,3 +89,5 @@ def test_approve_delivers_when_smtp_mocked(
     latest = outbox.json()[0]
     assert latest["to_email"] == "james@example.com"
     assert latest["delivered"] is True
+    assert "not held until approved" not in latest["body"].lower()
+    assert "now held" in latest["body"].lower()

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 
-from clerk.api.deps import StaffDep, require_staff
+from clerk.api.deps import ManagerDep, StaffDep, require_staff
 from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.models import InboundMessageRow
 from clerk.schemas.api import CreateInboundIn, InboundMessageOut
+from clerk.schemas.auth import MessageOut
 
 router = APIRouter(prefix="/api/inbox", tags=["inbox"])
 
@@ -49,3 +50,14 @@ async def create_inbound(
         session.commit()
         session.refresh(row)
         return _inbound_out(row)
+
+
+@router.post("/reset-demo", response_model=MessageOut)
+async def reset_demo_inbox(request: Request, _: ManagerDep) -> MessageOut:
+    """Put sample inbox rows back on the list (managers only, demo/training)."""
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        for row in InboundRepository(session).list_recent(limit=500):
+            row.task_id = None
+        session.commit()
+    return MessageOut(message="Demo inbox restored. Open a message again from the left list.")

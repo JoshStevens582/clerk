@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import {
   createInboundMessage,
+  resetDemoInbox,
   type HealthStatus,
   type InboxMessage,
   type MessageResult,
@@ -149,6 +150,24 @@ export function ClerkWorkspace({
           Messages disappear after you open them once. Approvals stay in the list above until you
           approve or reject.
         </p>
+        {user.role === "manager" ? (
+          <button
+            type="button"
+            className="ghost"
+            disabled={busy}
+            onClick={() => {
+              void resetDemoInbox()
+                .then(() => onInboxChanged())
+                .catch((err) => {
+                  setInboundError(
+                    err instanceof Error ? err.message : "Could not reset demo inbox.",
+                  );
+                });
+            }}
+          >
+            Reset demo inbox
+          </button>
+        ) : null}
         <button
           type="button"
           className="new-chat"
