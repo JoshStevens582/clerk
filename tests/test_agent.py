@@ -1,9 +1,10 @@
 import pytest
+from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
 from clerk.config import Settings
 from clerk.schemas.agent import ClerkRunResult, ProposalKind
-from clerk.services.agent import ClerkAgentService, build_agent
+from clerk.services.agent import SYSTEM_PROMPT, AgentDeps, ClerkAgentService
 from clerk.services.demo_samples import result_for_sample
 from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
@@ -27,7 +28,7 @@ def test_demo_samples_match_plan(sample_id: str, expected_kind: ProposalKind) ->
 @pytest.mark.asyncio
 async def test_agent_output_passes_policy_with_fake_model() -> None:
     pages = PageStore("pages")
-    settings = Settings(openai_api_key="sk-test", pages_dir="pages")
+    settings = Settings(pages_dir="pages")
     structured = ClerkRunResult(
         kind=ProposalKind.BOOKING_DRAFT,
         draft_subject="Booking",
@@ -38,8 +39,12 @@ async def test_agent_output_passes_policy_with_fake_model() -> None:
         booking_time="10:00",
     )
     test_model = TestModel(call_tools=[], custom_output_args=structured.model_dump())
-    agent = build_agent(settings, pages)
-    agent.model = test_model
+    agent: Agent[AgentDeps, ClerkRunResult] = Agent(
+        test_model,
+        deps_type=AgentDeps,
+        output_type=ClerkRunResult,
+        system_prompt=SYSTEM_PROMPT,
+    )
     service = ClerkAgentService(settings, pages, agent=agent)
     run = await service.interpret("Book Thursday at 10")
     policy = PolicyService(pages)
