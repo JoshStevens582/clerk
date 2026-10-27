@@ -1,8 +1,9 @@
-import type { HealthStatus, MessageResult, OutboxItem, QueueItem } from "../api";
+import type { HealthStatus, MessageResult, OutboxItem, QueueItem, StaffUser } from "../api";
 import { INBOX, type InboxMessage } from "../inbox";
 import { kindLabel } from "../labels";
 
 type ClerkWorkspaceProps = {
+  user: StaffUser;
   health: HealthStatus | null;
   queue: QueueItem[];
   outbox: OutboxItem[];
@@ -18,6 +19,7 @@ type ClerkWorkspaceProps = {
 };
 
 export function ClerkWorkspace({
+  user,
   health,
   queue,
   outbox,
@@ -41,6 +43,10 @@ export function ClerkWorkspace({
           <span>Inbox automation</span>
         </div>
         <p className="workspace-name">Cape Town Physio</p>
+        <p className="section-label">
+          Signed in as {user.username}
+          {user.role === "manager" ? " · manager" : ""}
+        </p>
         <div className="health">
           <span
             className={`pill ${health === null ? "" : health.openai_configured ? "ok" : "warn"}`}

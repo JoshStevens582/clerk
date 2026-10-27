@@ -10,7 +10,7 @@ Summary:
 
 1. DNS: `agent.customchatandautomation.co.za` → VPS IP (`102.203.81.249`).
 2. `docker network create cca-edge` (once).
-3. Clone to `/opt/clerk`, `.env` with `OPENAI_API_KEY`, `OWNER_PASSWORD`, `SESSION_SECRET`, `CORS_ORIGINS` empty.
+3. Clone to `/opt/clerk`, `.env` with `OPENAI_API_KEY`, `SESSION_SECRET`, `CLERK_BOOTSTRAP_STAFF` (or run `bash deploy/bootstrap-server-env.sh` once), `CORS_ORIGINS` empty.
 4. `docker compose -f docker-compose.yml -f deploy/compose.edge.yml up -d --build`
 5. Add the Clerk site block to Atlas Caddy and redeploy Atlas `web`.
 6. Open `https://agent.customchatandautomation.co.za` and sign in before using the demo.

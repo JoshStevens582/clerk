@@ -16,7 +16,8 @@ if [[ -f /opt/counter/.env ]]; then
   openai="${OPENAI_API_KEY:-}"
 fi
 session="$(openssl rand -hex 32)"
-owner="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)"
+owner_pass="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)"
+reception_pass="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)"
 cat > .env <<EOF
 OPENAI_API_KEY=${openai}
 OPENAI_CHAT_MODEL=gpt-4o-mini
@@ -24,7 +25,8 @@ PAGES_DIR=./pages
 DATABASE_URL=sqlite:///./data/clerk.db
 CORS_ORIGINS=
 SESSION_SECRET=${session}
-OWNER_PASSWORD=${owner}
+CLERK_BOOTSTRAP_STAFF=owner:${owner_pass}:manager,reception:${reception_pass}:staff
+CLERK_ADMIN_USERNAMES=owner
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_PER_MINUTE=10
 RATE_LIMIT_PER_DAY=40
@@ -32,4 +34,4 @@ RATE_LIMIT_GLOBAL_PER_DAY=200
 LOG_LEVEL=INFO
 EOF
 chmod 600 .env
-echo "Wrote ${ROOT}/.env — owner login password is in that file on the server."
+echo "Wrote ${ROOT}/.env — staff passwords are in CLERK_BOOTSTRAP_STAFF (only applied on first boot)."

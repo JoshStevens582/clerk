@@ -63,13 +63,14 @@ class TaskRepository:
     def get(self, task_id: int) -> TaskRow | None:
         return self._session.get(TaskRow, task_id)
 
-    def approve(self, task_id: int) -> TaskRow | None:
+    def approve(self, task_id: int, *, resolved_by_username: str | None = None) -> TaskRow | None:
         row = self.get(task_id)
         if row is None or row.status != "pending":
             return row
         row.status = "approved"
         row.slot_held = True
         row.resolved_at = datetime.now(tz=UTC)
+        row.resolved_by_username = resolved_by_username
         self._add_outbox(
             kind=row.kind,
             subject=row.draft_subject,
@@ -78,12 +79,13 @@ class TaskRepository:
         )
         return row
 
-    def reject(self, task_id: int) -> TaskRow | None:
+    def reject(self, task_id: int, *, resolved_by_username: str | None = None) -> TaskRow | None:
         row = self.get(task_id)
         if row is None or row.status != "pending":
             return row
         row.status = "rejected"
         row.resolved_at = datetime.now(tz=UTC)
+        row.resolved_by_username = resolved_by_username
         return row
 
     def list_outbox(self, limit: int = 50) -> list[OutboxRow]:

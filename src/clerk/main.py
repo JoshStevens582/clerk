@@ -10,6 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from clerk.api.routers.auth import router as auth_router
 from clerk.api.routers.health import router as health_router
 from clerk.api.routers.samples import router as samples_router
+from clerk.api.routers.staff import router as staff_router
 from clerk.api.routers.tasks import router as tasks_router
 from clerk.config import load_settings
 from clerk.repositories.db import create_db_engine, init_db, session_factory
@@ -17,6 +18,7 @@ from clerk.services.agent import ClerkAgentService
 from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
 from clerk.services.rate_limit import InMemoryRateLimiter
+from clerk.services.staff_auth import bootstrap_staff_users
 from clerk.services.workflow import ClerkWorkflow
 
 
@@ -40,6 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.page_store = page_store
     app.state.workflow = workflow
     app.state.rate_limiter = rate_limiter
+    bootstrap_staff_users(settings, db_factory)
     yield
 
 
@@ -64,6 +67,7 @@ def create_app() -> FastAPI:
         )
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(staff_router)
     app.include_router(samples_router)
     app.include_router(tasks_router)
     return app

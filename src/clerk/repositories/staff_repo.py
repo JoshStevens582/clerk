@@ -1,0 +1,46 @@
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from clerk.repositories.models import StaffUserRow
+from clerk.schemas.staff import StaffRole
+
+
+class StaffRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def count_users(self) -> int:
+        stmt = select(func.count()).select_from(StaffUserRow)
+        return int(self._session.scalar(stmt) or 0)
+
+    def get_by_username(self, username: str) -> StaffUserRow | None:
+        normalized = username.strip().lower()
+        stmt = select(StaffUserRow).where(StaffUserRow.username == normalized)
+        return self._session.scalar(stmt)
+
+    def list_active(self) -> list[StaffUserRow]:
+        stmt = (
+            select(StaffUserRow)
+            .where(StaffUserRow.active.is_(True))
+            .order_by(StaffUserRow.username)
+        )
+        return list(self._session.scalars(stmt))
+
+    def create_user(
+        self,
+        *,
+        username: str,
+        password_hash: str,
+        role: StaffRole,
+        display_name: str | None,
+    ) -> StaffUserRow:
+        row = StaffUserRow(
+            username=username.strip().lower(),
+            password_hash=password_hash,
+            role=role,
+            display_name=display_name,
+            active=True,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return row

@@ -35,6 +35,12 @@ export type HealthStatus = {
   pending_count: number;
 };
 
+export type StaffUser = {
+  username: string;
+  role: "staff" | "manager";
+  display_name: string | null;
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -48,11 +54,16 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function login(password: string): Promise<void> {
-  await api("/api/auth/login", {
+export async function login(username: string, password: string): Promise<StaffUser> {
+  const result = await api<{ user: StaffUser }>("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   });
+  return result.user;
+}
+
+export async function fetchSession(): Promise<StaffUser | null> {
+  return api<StaffUser | null>("/api/auth/session");
 }
 
 export async function logout(): Promise<void> {

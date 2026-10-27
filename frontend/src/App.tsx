@@ -5,8 +5,10 @@ import {
   fetchHealth,
   fetchOutbox,
   fetchQueue,
+  fetchSession,
   login,
   logout,
+  type StaffUser,
   rejectTask,
   submitMessage,
   type HealthStatus,
@@ -19,7 +21,8 @@ import { LoginScreen } from "./components/LoginScreen";
 import type { InboxMessage } from "./inbox";
 
 export function App() {
-  const [authed, setAuthed] = useState(false);
+  const [user, setUser] = useState<StaffUser | null>(null);
+  const [username, setUsername] = useState("reception");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -41,8 +44,8 @@ export function App() {
     event.preventDefault();
     setError(null);
     try {
-      await login(password);
-      setAuthed(true);
+      const signedIn = await login(username, password);
+      setUser(signedIn);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -51,7 +54,7 @@ export function App() {
 
   async function handleLogout() {
     await logout();
-    setAuthed(false);
+    setUser(null);
     setQueue([]);
     setOutbox([]);
     setLastResult(null);
@@ -103,20 +106,31 @@ export function App() {
   }
 
   useEffect(() => {
-    if (!authed) {
+    void fetchSession().then((session) => {
+      if (session?.username) {
+        setUser(session);
+        void refresh();
+      }
+    });
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!user) {
       return;
     }
     const timer = window.setInterval(() => {
       void refresh();
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [authed, refresh]);
+  }, [user, refresh]);
 
-  if (!authed) {
+  if (!user) {
     return (
       <LoginScreen
+        username={username}
         password={password}
         error={error}
+        onUsernameChange={setUsername}
         onPasswordChange={setPassword}
         onSubmit={handleLogin}
       />
@@ -125,6 +139,7 @@ export function App() {
 
   return (
     <ClerkWorkspace
+      user={user}
       health={health}
       queue={queue}
       outbox={outbox}

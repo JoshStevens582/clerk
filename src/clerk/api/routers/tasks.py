@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
-from clerk.api.deps import require_owner
+from clerk.api.deps import StaffDep, require_staff
 from clerk.repositories.task_repo import TaskRepository
 from clerk.schemas.api import MessageIn, MessageOut, OutboxItemOut, QueueItemOut
 from clerk.services.pages import PageStore
@@ -17,7 +17,7 @@ def _client_key(request: Request) -> str:
     return request.client.host
 
 
-@router.post("/messages", response_model=MessageOut, dependencies=[Depends(require_owner)])
+@router.post("/messages", response_model=MessageOut, dependencies=[Depends(require_staff)])
 async def submit_message(payload: MessageIn, request: Request) -> MessageOut:
     workflow: ClerkWorkflow = request.app.state.workflow
     limiter: InMemoryRateLimiter | None = request.app.state.rate_limiter
@@ -43,7 +43,7 @@ async def submit_message(payload: MessageIn, request: Request) -> MessageOut:
     )
 
 
-@router.get("/queue", response_model=list[QueueItemOut], dependencies=[Depends(require_owner)])
+@router.get("/queue", response_model=list[QueueItemOut], dependencies=[Depends(require_staff)])
 async def list_queue(request: Request) -> list[QueueItemOut]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     pages: PageStore = request.app.state.page_store
@@ -75,12 +75,12 @@ async def list_queue(request: Request) -> list[QueueItemOut]:
         return items
 
 
-@router.post("/queue/{task_id}/approve", dependencies=[Depends(require_owner)])
-async def approve_task(task_id: int, request: Request) -> dict[str, str]:
+@router.post("/queue/{task_id}/approve", dependencies=[Depends(require_staff)])
+async def approve_task(task_id: int, request: Request, staff: StaffDep) -> dict[str, str]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     with db_factory() as session:
         repo = TaskRepository(session)
-        row = repo.approve(task_id)
+        row = repo.approve(task_id, resolved_by_username=staff.username)
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
         if row.status != "approved":
@@ -92,12 +92,12 @@ async def approve_task(task_id: int, request: Request) -> dict[str, str]:
     return {"status": "approved"}
 
 
-@router.post("/queue/{task_id}/reject", dependencies=[Depends(require_owner)])
-async def reject_task(task_id: int, request: Request) -> dict[str, str]:
+@router.post("/queue/{task_id}/reject", dependencies=[Depends(require_staff)])
+async def reject_task(task_id: int, request: Request, staff: StaffDep) -> dict[str, str]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     with db_factory() as session:
         repo = TaskRepository(session)
-        row = repo.reject(task_id)
+        row = repo.reject(task_id, resolved_by_username=staff.username)
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
         if row.status != "rejected":
@@ -109,7 +109,7 @@ async def reject_task(task_id: int, request: Request) -> dict[str, str]:
     return {"status": "rejected"}
 
 
-@router.get("/outbox", response_model=list[OutboxItemOut], dependencies=[Depends(require_owner)])
+@router.get("/outbox", response_model=list[OutboxItemOut], dependencies=[Depends(require_staff)])
 async def list_outbox(request: Request) -> list[OutboxItemOut]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     with db_factory() as session:

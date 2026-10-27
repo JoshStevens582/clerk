@@ -9,7 +9,7 @@ from clerk.main import create_app
 @pytest.fixture
 def client(tmp_path) -> TestClient:
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path / 'http.db'}"
-    os.environ["OWNER_PASSWORD"] = "test-pass"
+    os.environ["CLERK_BOOTSTRAP_STAFF"] = "owner:test-pass-99:manager"
     os.environ["SESSION_SECRET"] = "test-secret"
     os.environ["RATE_LIMIT_ENABLED"] = "false"
     os.environ["PAGES_DIR"] = "pages"
@@ -29,7 +29,10 @@ def test_login_and_demo_flow(client: TestClient) -> None:
     )
     assert blocked.status_code == 401
 
-    login = client.post("/api/auth/login", json={"password": "test-pass"})
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "owner", "password": "test-pass-99"},
+    )
     assert login.status_code == 200
 
     sent = client.post(

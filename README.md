@@ -27,7 +27,9 @@ uv run uvicorn clerk.main:app --reload --port 8789 --app-dir src
 cd frontend && npm install && npm run dev
 ```
 
-Open `http://localhost:5175`, sign in with `OWNER_PASSWORD` from `.env` (default `demo-owner`).
+Open `http://localhost:5175`. **Staff sign-in (v2):** username + password. Local demo accounts from `CLERK_BOOTSTRAP_STAFF` in `.env` (default **owner** / **reception** with passwords in `.env.example`).
+
+Managers can add users: `uv run python -m clerk.staff_cli newname --role staff` or `POST /api/staff/users` while signed in as a manager.
 
 ## Tests and quality
 

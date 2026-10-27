@@ -6,14 +6,6 @@ from pydantic import BaseModel, Field
 from clerk.schemas.agent import PolicyOutcomeKind, QueueStatus
 
 
-class LoginIn(BaseModel):
-    password: str
-
-
-class LoginOut(BaseModel):
-    ok: bool = True
-
-
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=8000)
     sample_id: str | None = None

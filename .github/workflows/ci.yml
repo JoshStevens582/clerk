@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --group dev
+      - run: uv run ruff check .
+      - run: uv run mypy .
+      - run: uv run pytest --cov=clerk --cov-branch
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write throwaway .env
+        run: |
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" > .env
+          echo "RATE_LIMIT_ENABLED=false" >> .env
+          echo "OWNER_PASSWORD=ci-demo" >> .env
+          echo "SESSION_SECRET=ci-session-secret" >> .env
+      - name: Build images
+        run: docker compose build
+      - name: Create edge network
+        if: env.OPENAI_API_KEY != ''
+        run: docker network create cca-edge
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Build and start stack
+        if: env.OPENAI_API_KEY != ''
+        run: |
+          docker compose -f docker-compose.yml -f deploy/compose.ci.yml up -d --wait --wait-timeout 300
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Health through web proxy
+        if: env.OPENAI_API_KEY != ''
+        run: |
+          curl -fsS http://localhost:8090/api/live
+          curl -fsS http://localhost:8090/api/health
+          curl -fsS http://localhost:8090/ | grep -q 'id="root"'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Skip stack smoke (no OPENAI_API_KEY secret)
+        if: env.OPENAI_API_KEY == ''
+        run: |
+          echo "::notice::Docker images built. Add repo secret OPENAI_API_KEY for full compose smoke test."
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

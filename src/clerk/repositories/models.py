@@ -10,6 +10,18 @@ def _utcnow() -> datetime:
     return datetime.now(tz=UTC)
 
 
+class StaffUserRow(Base):
+    __tablename__ = "staff_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(256))
+    role: Mapped[str] = mapped_column(String(16), default="staff")
+    display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class TaskRow(Base):
     __tablename__ = "tasks"
 
@@ -26,6 +38,7 @@ class TaskRow(Base):
     outcome_message: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class OutboxRow(Base):
