@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
-import { clearStaffMfa, fetchStaffUsers, type StaffAdminUser } from "../api";
+import {
+  clearStaffMfa,
+  fetchStaffUsers,
+  setStaffUserDisabled,
+  setStaffUserRole,
+  type StaffAdminUser,
+} from "../api";
 
 type PeoplePanelProps = {
   signedInUsername: string;
@@ -23,16 +29,15 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
     });
   }, []);
 
-  async function onClearAuthenticator(username: string) {
+  async function runAdmin(action: () => Promise<void>) {
     setError(null);
     setNotice(null);
     setBusy(true);
     try {
-      await clearStaffMfa(username);
-      setNotice(`Authenticator cleared for ${username}. They sign in with password only until they turn MFA on again.`);
+      await action();
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not clear authenticator.");
+      setError(err instanceof Error ? err.message : "That change could not be saved.");
     } finally {
       setBusy(false);
     }
@@ -43,8 +48,8 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
       <header className="chat-header">
         <h1>People</h1>
         <p>
-          Managers can clear a locked-out staff member&apos;s authenticator (same as Atlas admin).
-          Signed in as {signedInUsername}.
+          Managers can promote or demote staff, disable accounts, or clear a locked-out
+          authenticator — same idea as Atlas admin People. Signed in as {signedInUsername}.
         </p>
         <button type="button" className="ghost" onClick={onBack}>
           Back to desk
@@ -59,6 +64,7 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
               <strong>{person.username}</strong>
               <span>
                 {person.role}
+                {!person.active ? " · disabled" : ""}
                 {person.email ? ` · ${person.email}` : ""}
                 {person.mfa_enabled ? " · authenticator on" : ""}
               </span>
@@ -66,17 +72,60 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
             <div className="people-actions">
               {person.username === signedInUsername ? (
                 <span className="pill ok">you</span>
-              ) : person.mfa_enabled ? (
-                <button
-                  type="button"
-                  className="pill"
-                  disabled={busy}
-                  onClick={() => void onClearAuthenticator(person.username)}
-                >
-                  Clear authenticator
-                </button>
               ) : (
-                <span className="pill">no MFA</span>
+                <>
+                  <button
+                    type="button"
+                    className="pill"
+                    disabled={busy}
+                    onClick={() =>
+                      void runAdmin(async () => {
+                        const nextRole = person.role === "manager" ? "staff" : "manager";
+                        await setStaffUserRole(person.username, nextRole);
+                        setNotice(
+                          `${person.username} is now ${nextRole === "manager" ? "a manager" : "staff"}.`,
+                        );
+                      })
+                    }
+                  >
+                    {person.role === "manager" ? "Make staff" : "Make manager"}
+                  </button>
+                  <button
+                    type="button"
+                    className="pill"
+                    disabled={busy}
+                    onClick={() =>
+                      void runAdmin(async () => {
+                        const disable = person.active;
+                        await setStaffUserDisabled(person.username, disable);
+                        setNotice(
+                          disable
+                            ? `${person.username} is disabled and signed out.`
+                            : `${person.username} is enabled again.`,
+                        );
+                      })
+                    }
+                  >
+                    {person.active ? "Disable" : "Enable"}
+                  </button>
+                  {person.mfa_enabled ? (
+                    <button
+                      type="button"
+                      className="pill"
+                      disabled={busy}
+                      onClick={() =>
+                        void runAdmin(async () => {
+                          await clearStaffMfa(person.username);
+                          setNotice(
+                            `Authenticator cleared for ${person.username}. They sign in with password only until they turn MFA on again.`,
+                          );
+                        })
+                      }
+                    >
+                      Clear authenticator
+                    </button>
+                  ) : null}
+                </>
               )}
             </div>
           </article>

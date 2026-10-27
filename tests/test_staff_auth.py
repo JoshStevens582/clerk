@@ -31,6 +31,51 @@ def test_manager_can_clear_another_users_mfa(
     assert cleared.status_code == 200
 
 
+def test_manager_people_admin_guards(
+    client: TestClient,
+    owner_auth: dict[str, str],
+) -> None:
+    assert client.post(
+        "/api/staff/users/owner/role",
+        headers=owner_auth,
+        json={"role": "staff"},
+    ).status_code == 400
+    assert client.post("/api/staff/users/owner/disable", headers=owner_auth).status_code == 400
+
+    promoted = client.post(
+        "/api/staff/users/reception/role",
+        headers=owner_auth,
+        json={"role": "manager"},
+    )
+    assert promoted.status_code == 200
+    assert promoted.json()["role"] == "manager"
+
+    demoted = client.post(
+        "/api/staff/users/reception/role",
+        headers=owner_auth,
+        json={"role": "staff"},
+    )
+    assert demoted.status_code == 200
+
+    disabled = client.post("/api/staff/users/reception/disable", headers=owner_auth)
+    assert disabled.status_code == 200
+    assert disabled.json()["active"] is False
+
+    users = client.get("/api/staff/users", headers=owner_auth)
+    reception = next(item for item in users.json() if item["username"] == "reception")
+    assert reception["active"] is False
+
+    login_blocked = client.post(
+        "/api/auth/login",
+        json={"username": "reception", "password": "test-pass-99"},
+    )
+    assert login_blocked.status_code == 401
+
+    enabled = client.post("/api/staff/users/reception/enable", headers=owner_auth)
+    assert enabled.status_code == 200
+    assert enabled.json()["active"] is True
+
+
 def test_manager_can_create_a_staff_user(client: TestClient, owner_auth: dict[str, str]) -> None:
     created = client.post(
         "/api/staff/users",

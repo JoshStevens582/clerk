@@ -35,6 +35,34 @@ class StaffRepository:
         )
         return list(self._session.scalars(stmt))
 
+    def list_all(self) -> list[StaffUserRow]:
+        stmt = select(StaffUserRow).order_by(StaffUserRow.username)
+        return list(self._session.scalars(stmt))
+
+    def count_managers(self) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(StaffUserRow)
+            .where(StaffUserRow.role == "manager")
+        )
+        return int(self._session.scalar(stmt) or 0)
+
+    def set_role(self, user_id: int, role: str) -> StaffUserRow | None:
+        row = self.get_by_id(user_id)
+        if row is None:
+            return None
+        row.role = role
+        self._session.flush()
+        return row
+
+    def set_active(self, user_id: int, active: bool) -> StaffUserRow | None:
+        row = self.get_by_id(user_id)
+        if row is None:
+            return None
+        row.active = active
+        self._session.flush()
+        return row
+
     def create_user(
         self,
         *,

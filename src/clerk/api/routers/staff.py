@@ -4,28 +4,30 @@ from sqlalchemy.orm import Session, sessionmaker
 from clerk.api.deps import ManagerDep
 from clerk.repositories.staff_repo import StaffRepository
 from clerk.schemas.auth import MessageOut
-from clerk.schemas.staff import CreateStaffIn, StaffAdminOut, StaffUserOut
+from clerk.schemas.staff import CreateStaffIn, SetStaffRoleIn, StaffAdminOut, StaffUserOut
 from clerk.services.mfa import AuthError, clear_user_mfa
+from clerk.services.staff_admin import (
+    StaffAdminError,
+    StaffAdminNotFoundError,
+    list_staff_admin_users,
+    set_staff_user_active,
+    set_staff_user_role,
+)
 from clerk.services.staff_auth import hash_password, staff_user_out
 
 router = APIRouter(prefix="/api/staff", tags=["staff"])
 
 
+def _admin_http(exc: StaffAdminError) -> HTTPException:
+    if isinstance(exc, StaffAdminNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
 @router.get("/users", response_model=list[StaffAdminOut])
 async def list_staff_users(request: Request, _: ManagerDep) -> list[StaffAdminOut]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
-    with db_factory() as session:
-        rows = StaffRepository(session).list_active()
-        return [
-            StaffAdminOut(
-                username=row.username,
-                role="manager" if row.role == "manager" else "staff",
-                email=row.email,
-                mfa_enabled=row.mfa_enabled_at is not None,
-                active=row.active,
-            )
-            for row in rows
-        ]
+    return list_staff_admin_users(db_factory)
 
 
 @router.post("/users", response_model=StaffUserOut, status_code=status.HTTP_201_CREATED)
@@ -51,6 +53,61 @@ async def create_staff_user(
         )
         session.commit()
         return staff_user_out(row)
+
+
+@router.post("/users/{username}/role", response_model=StaffAdminOut)
+async def change_staff_role(
+    username: str,
+    payload: SetStaffRoleIn,
+    request: Request,
+    manager: ManagerDep,
+) -> StaffAdminOut:
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    try:
+        return set_staff_user_role(
+            db_factory,
+            actor_username=manager.username,
+            username=username,
+            role=payload.role,
+        )
+    except StaffAdminError as exc:
+        raise _admin_http(exc) from exc
+
+
+@router.post("/users/{username}/disable", response_model=StaffAdminOut)
+async def disable_staff_user(
+    username: str,
+    request: Request,
+    manager: ManagerDep,
+) -> StaffAdminOut:
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    try:
+        return set_staff_user_active(
+            db_factory,
+            actor_username=manager.username,
+            username=username,
+            active=False,
+        )
+    except StaffAdminError as exc:
+        raise _admin_http(exc) from exc
+
+
+@router.post("/users/{username}/enable", response_model=StaffAdminOut)
+async def enable_staff_user(
+    username: str,
+    request: Request,
+    manager: ManagerDep,
+) -> StaffAdminOut:
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    try:
+        return set_staff_user_active(
+            db_factory,
+            actor_username=manager.username,
+            username=username,
+            active=True,
+        )
+    except StaffAdminError as exc:
+        raise _admin_http(exc) from exc
 
 
 @router.post("/users/{username}/mfa/reset", response_model=MessageOut)

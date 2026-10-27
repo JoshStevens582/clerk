@@ -20,6 +20,10 @@ class StaffAdminOut(BaseModel):
     active: bool = True
 
 
+class SetStaffRoleIn(BaseModel):
+    role: StaffRole
+
+
 class CreateStaffIn(BaseModel):
     username: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9_-]+$")
     password: str = Field(min_length=8, max_length=256)

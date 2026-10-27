@@ -428,6 +428,26 @@ export async function clearStaffMfa(username: string): Promise<void> {
   await api(`/api/staff/users/${encodeURIComponent(username)}/mfa/reset`, { method: "POST" });
 }
 
+export async function setStaffUserRole(
+  username: string,
+  role: "staff" | "manager",
+): Promise<StaffAdminUser> {
+  return api<StaffAdminUser>(`/api/staff/users/${encodeURIComponent(username)}/role`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function setStaffUserDisabled(
+  username: string,
+  disabled: boolean,
+): Promise<StaffAdminUser> {
+  const action = disabled ? "disable" : "enable";
+  return api<StaffAdminUser>(`/api/staff/users/${encodeURIComponent(username)}/${action}`, {
+    method: "POST",
+  });
+}
+
 export async function logout(): Promise<void> {
   const refresh = sessionStorage.getItem(REFRESH_KEY);
   if (refresh) {
