@@ -458,6 +458,10 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
+.chat-header .show-sent {
+  margin-bottom: 10px;
+}
+
 .chat-header h1 {
   margin: 0;
   font-size: 22px;

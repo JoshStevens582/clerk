@@ -379,6 +379,15 @@ export function ClerkWorkspace({
 
       <main className="panel main">
         <header className="chat-header">
+          {sentCollapsed ? (
+            <button
+              type="button"
+              className="pane-collapse show-sent"
+              onClick={() => setSentCollapsed(false)}
+            >
+              Show sent
+            </button>
+          ) : null}
           {selected ? (
             <>
               <h1>{selected.subject}</h1>
