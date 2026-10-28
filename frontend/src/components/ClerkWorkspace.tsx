@@ -76,6 +76,28 @@ export function ClerkWorkspace({
   const [inboundError, setInboundError] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("desk");
   const [sentCollapsed, setSentCollapsed] = useState(false);
+  const [sentCutoffMs, setSentCutoffMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!demoDesk) {
+      setSentCutoffMs(null);
+      return;
+    }
+    const stored = sessionStorage.getItem("clerk_demo_sent_after");
+    const parsed = stored ? Number(stored) : Number.NaN;
+    if (Number.isFinite(parsed)) {
+      setSentCutoffMs(parsed);
+      return;
+    }
+    const startedAt = Date.now();
+    sessionStorage.setItem("clerk_demo_sent_after", String(startedAt));
+    setSentCutoffMs(startedAt);
+  }, [demoDesk]);
+
+  const visibleOutbox =
+    sentCutoffMs === null
+      ? outbox
+      : outbox.filter((item) => new Date(item.sent_at).getTime() + 15_000 >= sentCutoffMs);
 
   useEffect(() => {
     if (selected) {
@@ -130,7 +152,7 @@ export function ClerkWorkspace({
           onClick={() => setMobilePane("sent")}
         >
           Sent
-          {outbox.length > 0 ? ` (${outbox.length})` : ""}
+          {visibleOutbox.length > 0 ? ` (${visibleOutbox.length})` : ""}
         </button>
       </nav>
       <aside className="panel sidebar">
@@ -514,11 +536,15 @@ export function ClerkWorkspace({
             {sentCollapsed ? "Show" : "Hide"}
           </button>
         </div>
-        {outbox.length === 0 ? (
-          <p className="muted-copy">Auto-replies and approved mail show here.</p>
+        {visibleOutbox.length === 0 ? (
+          <p className="muted-copy">
+            {demoDesk
+              ? "Nothing sent this visit. Approve a draft and it shows up here."
+              : "Auto-replies and approved mail show here."}
+          </p>
         ) : (
           <div className="stack">
-            {outbox.map((item) => (
+            {visibleOutbox.map((item) => (
               <div key={item.id} className="source-card">
                 <header>
                   <strong>{kindLabel(item.kind)}</strong>

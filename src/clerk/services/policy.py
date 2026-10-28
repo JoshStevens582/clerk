@@ -90,11 +90,7 @@ class PolicyService:
                     block_reason="invented_leave_days",
                 )
 
-        label = (
-            "Booking draft queued for approval."
-            if proposal.kind == ProposalKind.BOOKING_DRAFT
-            else "Email draft queued for approval."
-        )
+        label = "Nothing has been sent yet. Press Approve and send."
         return PolicyOutcome(
             kind=PolicyOutcomeKind.QUEUED,
             message=label,

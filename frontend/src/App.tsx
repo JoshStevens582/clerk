@@ -75,6 +75,7 @@ export function App() {
     setUser(null);
     setDemoDesk(false);
     setMfaEnabled(false);
+    sessionStorage.removeItem("clerk_demo_sent_after");
     setSecurityOpen(false);
     setPeopleOpen(false);
     setQueue([]);
@@ -112,6 +113,17 @@ export function App() {
     setError(null);
     try {
       await approveTask(taskId);
+      setLastResult((current) =>
+        current && current.task_id === taskId
+          ? {
+              ...current,
+              outcome_kind: "approved",
+              message: "Sent.",
+              queue_status: "approved",
+              auto_reply_text: null,
+            }
+          : current,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approve failed");
@@ -125,6 +137,17 @@ export function App() {
     setError(null);
     try {
       await rejectTask(taskId);
+      setLastResult((current) =>
+        current && current.task_id === taskId
+          ? {
+              ...current,
+              outcome_kind: "rejected",
+              message: "Rejected. Nothing was sent.",
+              queue_status: "rejected",
+              auto_reply_text: null,
+            }
+          : current,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reject failed");
