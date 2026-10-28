@@ -81,6 +81,7 @@ export type StaffAdminUser = {
 export type Me = {
   user: StaffUser;
   mfa_enabled: boolean;
+  demo_desk?: boolean;
 };
 
 export type MfaSetup = {

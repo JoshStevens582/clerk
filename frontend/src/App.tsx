@@ -26,6 +26,7 @@ import { SecurityPanel } from "./components/SecurityPanel";
 
 export function App() {
   const [user, setUser] = useState<StaffUser | null>(null);
+  const [demoDesk, setDemoDesk] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
@@ -55,6 +56,7 @@ export function App() {
   async function loadMe() {
     const me = await fetchMe();
     setUser(me.user);
+    setDemoDesk(Boolean(me.demo_desk));
     setMfaEnabled(me.mfa_enabled);
   }
 
@@ -71,6 +73,7 @@ export function App() {
   async function handleLogout() {
     await logout();
     setUser(null);
+    setDemoDesk(false);
     setMfaEnabled(false);
     setSecurityOpen(false);
     setPeopleOpen(false);
@@ -189,6 +192,7 @@ export function App() {
   return (
     <ClerkWorkspace
       user={user}
+      demoDesk={demoDesk}
       mfaEnabled={mfaEnabled}
       health={health}
       inbox={inbox}

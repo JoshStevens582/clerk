@@ -67,3 +67,47 @@ def test_demo_inbox_only_sample_rows(demo_client: TestClient) -> None:
     rows = inbox.json()
     assert all(row.get("sample_id") for row in rows)
     assert not any(row["from_email"] == "real@patient.co.za" for row in rows)
+
+
+def test_demo_examples_stay_available_after_open(demo_client: TestClient) -> None:
+    demo = demo_client.post("/api/auth/demo")
+    assert demo.status_code == 200
+    headers = {"Authorization": f"Bearer {demo.json()['access_token']}"}
+
+    me = demo_client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["demo_desk"] is True
+
+    first = demo_client.get("/api/inbox", headers=headers)
+    assert first.status_code == 200
+    rows = first.json()
+    assert [row["sample_id"] for row in rows] == [
+        "after_hours_thursday",
+        "booking_thursday_10",
+        "tax_return_email",
+        "leave_hr_email",
+    ]
+    opened = rows[0]
+    handled = demo_client.post(
+        "/api/messages",
+        headers=headers,
+        json={
+            "text": opened["body"],
+            "sample_id": opened["sample_id"],
+            "inbound_id": opened["id"],
+        },
+    )
+    assert handled.status_code == 200, handled.text
+
+    again = demo_client.get("/api/inbox", headers=headers)
+    assert again.status_code == 200
+    again_rows = again.json()
+    assert [row["sample_id"] for row in again_rows] == [
+        "after_hours_thursday",
+        "booking_thursday_10",
+        "tax_return_email",
+        "leave_hr_email",
+    ]
+    replacement = again_rows[0]
+    assert replacement["id"] != opened["id"]
+    assert replacement["handled"] is False

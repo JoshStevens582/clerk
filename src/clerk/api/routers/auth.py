@@ -31,7 +31,7 @@ from clerk.schemas.auth import (
     UpdateEmailRequest,
 )
 from clerk.schemas.staff import StaffUserOut
-from clerk.services.demo_accounts import first_demo_credentials
+from clerk.services.demo_accounts import first_demo_credentials, is_demo_staff
 from clerk.services.jwt_tokens import issue_mfa_challenge_token, verify_mfa_challenge_token
 from clerk.services.mfa import (
     AuthError as MfaAuthError,
@@ -263,7 +263,11 @@ async def me(staff: StaffDep, request: Request) -> MeOut:
         row = StaffRepository(session).get_by_id(staff.user_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
-    return MeOut(user=staff_user_out(row), mfa_enabled=staff.mfa_enabled)
+    return MeOut(
+        user=staff_user_out(row),
+        mfa_enabled=staff.mfa_enabled,
+        demo_desk=is_demo_staff(request.app.state.settings, staff.username),
+    )
 
 
 @router.post("/forgot-password", response_model=MessageOut)

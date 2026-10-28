@@ -7,6 +7,7 @@ from clerk.repositories.models import InboundMessageRow
 from clerk.schemas.api import CreateInboundIn, InboundMessageOut
 from clerk.schemas.auth import MessageOut
 from clerk.services.demo_accounts import is_demo_staff
+from clerk.services.inbox_seed import ensure_demo_inbox_samples, ordered_demo_samples
 
 router = APIRouter(prefix="/api/inbox", tags=["inbox"])
 
@@ -29,13 +30,14 @@ def _inbound_out(row: InboundMessageRow) -> InboundMessageOut:
 async def list_inbox(request: Request, staff: StaffDep) -> list[InboundMessageOut]:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     settings = request.app.state.settings
+    demo_desk = is_demo_staff(settings, staff.username)
+    if demo_desk:
+        ensure_demo_inbox_samples(db_factory)
     with db_factory() as session:
         repo = InboundRepository(session)
-        rows = (
-            repo.list_open_demo_samples()
-            if is_demo_staff(settings, staff.username)
-            else repo.list_open()
-        )
+        rows = repo.list_open_demo_samples() if demo_desk else repo.list_open()
+        if demo_desk:
+            rows = ordered_demo_samples(rows)
         return [_inbound_out(row) for row in rows]
 
 

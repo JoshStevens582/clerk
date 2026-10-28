@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session, sessionmaker
 
 from clerk.repositories.inbound_repo import InboundRepository
+from clerk.repositories.models import InboundMessageRow
 
 DEMO_INBOX: list[dict[str, str | None]] = [
     {
@@ -48,11 +49,13 @@ def seed_demo_inbox(db_factory: sessionmaker[Session]) -> None:
 
 
 def ensure_demo_inbox_samples(db_factory: sessionmaker[Session]) -> None:
+    """Keep one unhandled copy of each example so demo visitors can open them again."""
     with db_factory() as session:
         repo = InboundRepository(session)
+        created = False
         for item in DEMO_INBOX:
             sample_id = item["sample_id"]
-            if sample_id and repo.get_by_sample_id(str(sample_id)) is not None:
+            if not sample_id or repo.has_open_sample(str(sample_id)):
                 continue
             repo.create(
                 from_name=str(item["from_name"]),
@@ -63,4 +66,20 @@ def ensure_demo_inbox_samples(db_factory: sessionmaker[Session]) -> None:
                 sample_id=sample_id,
                 source="demo",
             )
-        session.commit()
+            created = True
+        if created:
+            session.commit()
+
+
+def ordered_demo_samples(rows: list[InboundMessageRow]) -> list[InboundMessageRow]:
+    """Catalog order, then any extra open samples."""
+    by_sample: dict[str, InboundMessageRow] = {
+        row.sample_id: row for row in rows if row.sample_id
+    }
+    ordered: list[InboundMessageRow] = []
+    for item in DEMO_INBOX:
+        sample_id = item["sample_id"]
+        if sample_id and sample_id in by_sample:
+            ordered.append(by_sample.pop(sample_id))
+    ordered.extend(by_sample.values())
+    return ordered

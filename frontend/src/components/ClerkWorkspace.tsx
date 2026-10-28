@@ -14,8 +14,16 @@ import { kindLabel } from "../labels";
 
 type MobilePane = "inbox" | "desk" | "sent";
 
+const EXAMPLE_CAPTION: Record<string, string> = {
+  after_hours_thursday: "Auto-reply — sends the agreed sentence",
+  booking_thursday_10: "Booking — waits for your approval",
+  tax_return_email: "Client email — waits for your approval",
+  leave_hr_email: "HR email — waits for your approval",
+};
+
 type ClerkWorkspaceProps = {
   user: StaffUser;
+  demoDesk?: boolean;
   mfaEnabled: boolean;
   health: HealthStatus | null;
   inbox: InboxMessage[];
@@ -37,6 +45,7 @@ type ClerkWorkspaceProps = {
 
 export function ClerkWorkspace({
   user,
+  demoDesk = false,
   mfaEnabled,
   health,
   inbox,
@@ -223,12 +232,13 @@ export function ClerkWorkspace({
             </div>
           </>
         ) : null}
-        <p className="section-label">Inbox — not handled yet</p>
+        <p className="section-label">{demoDesk ? "Examples" : "Inbox — not handled yet"}</p>
         <p className="muted-copy inbox-hint">
-          Messages disappear after you open them once. Approvals stay in the list above until you
-          approve or reject.
+          {demoDesk
+            ? "Open any example. It stays in this list so you can try it again."
+            : "Messages disappear after you open them once. Approvals stay in the list above until you approve or reject."}
         </p>
-        {user.role === "manager" ? (
+        {user.role === "manager" && !demoDesk ? (
           <button
             type="button"
             className="ghost"
@@ -246,14 +256,16 @@ export function ClerkWorkspace({
             Reset demo inbox
           </button>
         ) : null}
-        <button
-          type="button"
-          className="new-chat"
-          onClick={() => setShowAddInbound((open) => !open)}
-        >
-          {showAddInbound ? "Cancel" : "Add inbound message"}
-        </button>
-        {showAddInbound ? (
+        {demoDesk ? null : (
+          <button
+            type="button"
+            className="new-chat"
+            onClick={() => setShowAddInbound((open) => !open)}
+          >
+            {showAddInbound ? "Cancel" : "Add inbound message"}
+          </button>
+        )}
+        {showAddInbound && !demoDesk ? (
           <form className="inbound-form" onSubmit={(e) => void onSubmitInbound(e)}>
             {inboundError ? <p className="error">{inboundError}</p> : null}
             <label>
@@ -297,11 +309,16 @@ export function ClerkWorkspace({
         ) : null}
         <div className="stack">
           {inbox.length === 0 ? (
-            <p className="muted-copy">No open messages. Add one or use the webhook.</p>
+            <p className="muted-copy">
+              {demoDesk
+                ? "Examples are unavailable right now. Refresh the page."
+                : "No open messages. Add one or use the webhook."}
+            </p>
           ) : (
             inbox.map((message) => {
               const isActive = selected?.id === message.id;
               const handled = processedIds.has(String(message.id));
+              const caption = message.sampleId ? EXAMPLE_CAPTION[message.sampleId] : undefined;
               return (
                 <button
                   key={message.id}
@@ -313,8 +330,9 @@ export function ClerkWorkspace({
                   <span>
                     {message.subject}
                     <small>
-                      {message.from} · {message.receivedLabel}
-                      {handled ? " · Handled" : ""}
+                      {demoDesk && caption
+                        ? caption
+                        : `${message.from} · ${message.receivedLabel}${handled ? " · Handled" : ""}`}
                     </small>
                   </span>
                 </button>
@@ -437,7 +455,37 @@ export function ClerkWorkspace({
             </article>
           ) : queue.length === 0 ? (
             <div className="empty">
-              <p>Pick a message in the left inbox, or add one with Add inbound message.</p>
+              {demoDesk && inbox.length > 0 ? (
+                <>
+                  <p>Try an example. Clerk either sends the agreed reply or queues a draft for you.</p>
+                  <div className="stack">
+                    {inbox.map((message) => (
+                      <button
+                        key={message.id}
+                        type="button"
+                        className="row"
+                        disabled={busy}
+                        onClick={() => onSelectInbox(message)}
+                      >
+                        <span>
+                          {message.subject}
+                          <small>
+                            {message.sampleId
+                              ? EXAMPLE_CAPTION[message.sampleId]
+                              : message.from}
+                          </small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p>
+                  {demoDesk
+                    ? "Examples are unavailable right now. Refresh the page."
+                    : "Pick a message in the left inbox, or add one with Add inbound message."}
+                </p>
+              )}
             </div>
           ) : null}
 
@@ -479,10 +527,10 @@ export function ClerkWorkspace({
                 {item.to_email ? <p className="out-subject">To: {item.to_email}</p> : null}
                 {item.subject ? <p className="out-subject">{item.subject}</p> : null}
                 <p>{item.body}</p>
-                {item.delivered ? (
-                  <p className="pill ok">Delivered via SMTP</p>
-                ) : item.delivery_error ? (
+                {item.delivery_error ? (
                   <p className="muted-copy">{item.delivery_error}</p>
+                ) : item.delivered ? (
+                  <p className="pill ok">Delivered via SMTP</p>
                 ) : null}
               </div>
             ))}

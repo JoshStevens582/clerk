@@ -52,6 +52,7 @@ class UpdateEmailRequest(BaseModel):
 class MeOut(BaseModel):
     user: StaffUserOut
     mfa_enabled: bool = False
+    demo_desk: bool = False
 
 
 class ChangePasswordRequest(BaseModel):
