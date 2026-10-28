@@ -75,7 +75,6 @@ export function App() {
     setUser(null);
     setDemoDesk(false);
     setMfaEnabled(false);
-    sessionStorage.removeItem("clerk_demo_sent_after");
     setSecurityOpen(false);
     setPeopleOpen(false);
     setQueue([]);
