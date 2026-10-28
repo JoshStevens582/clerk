@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from clerk.repositories.models import InboundMessageRow, OutboxRow, TaskRow
@@ -155,6 +155,33 @@ class TaskRepository:
         row.resolved_at = datetime.now(tz=UTC)
         row.resolved_by_username = resolved_by_username
         return row
+
+    def clear_demo_mail(self) -> None:
+        """Remove demo outbox rows and pending demo drafts. Live patient mail stays."""
+        demo_task_ids = list(self._session.scalars(self._demo_task_id_query()))
+        if not demo_task_ids:
+            return
+        self._session.execute(
+            delete(OutboxRow).where(OutboxRow.source_task_id.in_(demo_task_ids))
+        )
+        self._session.execute(
+            delete(TaskRow).where(
+                TaskRow.id.in_(demo_task_ids),
+                TaskRow.status == "pending",
+            )
+        )
+
+    def _demo_task_id_query(self) -> Select[int]:
+        return (
+            select(TaskRow.id)
+            .outerjoin(InboundMessageRow, TaskRow.inbound_message_id == InboundMessageRow.id)
+            .where(
+                or_(
+                    TaskRow.inbound_message_id.is_(None),
+                    InboundMessageRow.sample_id.is_not(None),
+                )
+            )
+        )
 
     def list_outbox(self, limit: int = 50) -> list[OutboxRow]:
         stmt = select(OutboxRow).order_by(OutboxRow.sent_at.desc()).limit(limit)

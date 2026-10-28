@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from clerk.api.deps import ManagerDep, StaffDep
 from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.models import InboundMessageRow
+from clerk.repositories.task_repo import TaskRepository
 from clerk.schemas.api import CreateInboundIn, InboundMessageOut
 from clerk.schemas.auth import MessageOut
 from clerk.services.demo_accounts import is_demo_staff
@@ -65,6 +66,22 @@ async def create_inbound(
         session.commit()
         session.refresh(row)
         return _inbound_out(row)
+
+
+@router.post("/clear-demo-mail", response_model=MessageOut)
+async def clear_demo_mail(request: Request, staff: StaffDep) -> MessageOut:
+    """Demo visitors only. Deletes sample sends and pending drafts, not live patient mail."""
+    settings = request.app.state.settings
+    if not is_demo_staff(settings, staff.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the demo desk can clear demo mail.",
+        )
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        TaskRepository(session).clear_demo_mail()
+        session.commit()
+    return MessageOut(message="Demo mail cleared. Real patient mail was left in place.")
 
 
 @router.post("/reset-demo", response_model=MessageOut)

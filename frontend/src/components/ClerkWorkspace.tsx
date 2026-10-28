@@ -41,6 +41,7 @@ type ClerkWorkspaceProps = {
   onOpenPeople?: () => void;
   onLogout: () => void;
   onInboxChanged: () => void;
+  onClearDemoMail?: () => void;
 };
 
 export function ClerkWorkspace({
@@ -63,6 +64,7 @@ export function ClerkWorkspace({
   onOpenPeople,
   onLogout,
   onInboxChanged,
+  onClearDemoMail,
 }: ClerkWorkspaceProps) {
   const pending = queue.length;
   const [showAddInbound, setShowAddInbound] = useState(false);
@@ -238,6 +240,16 @@ export function ClerkWorkspace({
             ? "Open any example. It stays in this list so you can try it again."
             : "Messages disappear after you open them once. Approvals stay in the list above until you approve or reject."}
         </p>
+        {demoDesk && onClearDemoMail ? (
+          <button
+            type="button"
+            className="ghost"
+            disabled={busy}
+            onClick={onClearDemoMail}
+          >
+            Clear demo mail
+          </button>
+        ) : null}
         {user.role === "manager" && !demoDesk ? (
           <button
             type="button"

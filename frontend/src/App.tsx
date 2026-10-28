@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   approveTask,
+  clearDemoMail,
   fetchHealth,
   fetchInbox,
   fetchMe,
@@ -131,6 +132,24 @@ export function App() {
     }
   }
 
+  async function handleClearDemoMail() {
+    if (!window.confirm("Clear demo mail in Sent? Real patient mail stays.")) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await clearDemoMail();
+      setLastResult(null);
+      setSelected(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear demo mail.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleReject(taskId: number) {
     setBusy(true);
     setError(null);
@@ -242,6 +261,7 @@ export function App() {
       }
       onLogout={() => void handleLogout()}
       onInboxChanged={() => void refresh()}
+      onClearDemoMail={demoDesk ? () => void handleClearDemoMail() : undefined}
     />
   );
 }

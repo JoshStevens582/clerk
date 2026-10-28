@@ -111,3 +111,68 @@ def test_demo_examples_stay_available_after_open(demo_client: TestClient) -> Non
     replacement = again_rows[0]
     assert replacement["id"] != opened["id"]
     assert replacement["handled"] is False
+
+
+def test_clear_demo_mail_leaves_live_patient_mail(demo_client: TestClient) -> None:
+    owner = demo_client.post(
+        "/api/auth/login",
+        json={"username": "owner", "password": "test-pass-99"},
+    )
+    assert owner.status_code == 200
+    owner_headers = {"Authorization": f"Bearer {owner.json()['access_token']}"}
+
+    created = demo_client.post(
+        "/api/inbox",
+        headers=owner_headers,
+        json={
+            "from_name": "Real Patient",
+            "from_email": "real@patient.co.za",
+            "subject": "Live mail",
+            "body": "Do you have anything on Thursday?",
+            "channel": "Email",
+        },
+    )
+    assert created.status_code == 200
+    live = demo_client.post(
+        "/api/messages",
+        headers=owner_headers,
+        json={
+            "text": "Do you have anything on Thursday?",
+            "sample_id": "after_hours_thursday",
+            "inbound_id": created.json()["id"],
+            "reply_to_email": "real@patient.co.za",
+        },
+    )
+    assert live.status_code == 200, live.text
+
+    demo = demo_client.post("/api/auth/demo")
+    assert demo.status_code == 200
+    demo_headers = {"Authorization": f"Bearer {demo.json()['access_token']}"}
+    samples = demo_client.get("/api/inbox", headers=demo_headers).json()
+    sample = samples[0]
+    opened = demo_client.post(
+        "/api/messages",
+        headers=demo_headers,
+        json={
+            "text": sample["body"],
+            "sample_id": sample["sample_id"],
+            "inbound_id": sample["id"],
+        },
+    )
+    assert opened.status_code == 200, opened.text
+
+    denied = demo_client.post("/api/inbox/clear-demo-mail", headers=owner_headers)
+    assert denied.status_code == 403
+
+    cleared = demo_client.post("/api/inbox/clear-demo-mail", headers=demo_headers)
+    assert cleared.status_code == 200
+
+    demo_outbox = demo_client.get("/api/outbox", headers=demo_headers)
+    assert demo_outbox.status_code == 200
+    assert demo_outbox.json() == []
+
+    owner_outbox = demo_client.get("/api/outbox", headers=owner_headers)
+    assert owner_outbox.status_code == 200
+    live_rows = owner_outbox.json()
+    assert any(row["to_email"] == "real@patient.co.za" for row in live_rows)
+    assert all(row["to_email"] == "real@patient.co.za" for row in live_rows)
