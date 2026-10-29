@@ -26,6 +26,7 @@ def _inbound_out(row: InboundMessageRow) -> InboundMessageOut:
         subject=row.subject,
         body=row.body,
         channel=row.channel,
+        phone=row.phone,
         sample_id=row.sample_id,
         handled=row.task_id is not None,
         created_at=row.created_at,
@@ -63,6 +64,7 @@ async def inbound_webhook(
             subject=payload.subject,
             body=payload.body,
             channel=payload.channel,
+            phone=payload.phone,
             source="hook",
         )
         session.commit()

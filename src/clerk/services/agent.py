@@ -22,6 +22,9 @@ Rules:
   including fees.md when mentioning R650. Put R650 in claimed_amounts only if fees.md contains it.
   Never set slot as held.
 - If they ask for an email about tax return documents, draft from tax-return-documents.md only.
+- If the inbound channel is WhatsApp, or they ask for a WhatsApp, return kind=whatsapp_draft
+  with the message in draft_body. Cite page file names. Do not send it.
+  Put a price in claimed_amounts only when that exact text is on the cited page.
 - If they ask to email HR about leave carry-over, draft from leave-policy.md and put day counts
   in claimed_day_counts only when present on the page.
 - If a required fact is missing from the pages, return kind=missing_fact with a clear message.
@@ -73,6 +76,7 @@ class ClerkAgentService:
         text: str,
         *,
         sample_id: str | None = None,
+        channel: str | None = None,
     ) -> ClerkRunResult:
         if sample_id:
             sample = result_for_sample(sample_id)
@@ -87,6 +91,9 @@ class ClerkAgentService:
                 ),
             )
 
+        prompt = text
+        if channel and channel.strip().lower() == "whatsapp":
+            prompt = f"Inbound channel: WhatsApp.\n\n{text}"
         deps = AgentDeps(pages=self._pages)
-        run = await self._agent.run(text, deps=deps)
+        run = await self._agent.run(prompt, deps=deps)
         return run.output

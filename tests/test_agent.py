@@ -17,6 +17,7 @@ from clerk.services.policy import PolicyService
         ("booking_thursday_10", ProposalKind.BOOKING_DRAFT),
         ("tax_return_email", ProposalKind.EMAIL_DRAFT),
         ("leave_hr_email", ProposalKind.EMAIL_DRAFT),
+        ("whatsapp_session_fee", ProposalKind.WHATSAPP_DRAFT),
     ],
 )
 def test_demo_samples_match_plan(sample_id: str, expected_kind: ProposalKind) -> None:

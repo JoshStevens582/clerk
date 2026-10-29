@@ -18,7 +18,11 @@ class PolicyService:
         if proposal.kind == ProposalKind.AUTO_REPLY:
             return self._apply_auto_reply(proposal)
 
-        if proposal.kind in {ProposalKind.BOOKING_DRAFT, ProposalKind.EMAIL_DRAFT}:
+        if proposal.kind in {
+            ProposalKind.BOOKING_DRAFT,
+            ProposalKind.EMAIL_DRAFT,
+            ProposalKind.WHATSAPP_DRAFT,
+        }:
             return self._apply_draft(proposal)
 
         return PolicyOutcome(
@@ -90,7 +94,10 @@ class PolicyService:
                     block_reason="invented_leave_days",
                 )
 
-        label = "Nothing has been sent yet. Press Approve and send."
+        if proposal.kind == ProposalKind.WHATSAPP_DRAFT:
+            label = "Nothing has been sent yet. Press Approve."
+        else:
+            label = "Nothing has been sent yet. Press Approve and send."
         return PolicyOutcome(
             kind=PolicyOutcomeKind.QUEUED,
             message=label,

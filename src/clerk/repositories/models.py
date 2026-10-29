@@ -88,6 +88,7 @@ class InboundMessageRow(Base):
     subject: Mapped[str] = mapped_column(String(512))
     body: Mapped[str] = mapped_column(Text)
     channel: Mapped[str] = mapped_column(String(32), default="Email")
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     sample_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source: Mapped[str] = mapped_column(String(32), default="manual")
     external_id: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
@@ -105,6 +106,10 @@ class TaskRow(Base):
     inbound_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     inbound_subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
     reply_to_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    reply_channel: Mapped[str] = mapped_column(String(32), default="email")
+    reply_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    booking_day: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    booking_time: Mapped[str | None] = mapped_column(String(32), nullable=True)
     draft_subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
     draft_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     cited_pages_json: Mapped[str] = mapped_column(Text, default="[]")
@@ -125,10 +130,30 @@ class OutboxRow(Base):
     subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
     body: Mapped[str] = mapped_column(Text)
     to_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    channel: Mapped[str] = mapped_column(String(32), default="email")
+    to_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     delivered: Mapped[bool] = mapped_column(default=False)
     delivery_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     source_task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class ClientRecordRow(Base):
+    """Client file Clerk writes when it handles a message."""
+
+    __tablename__ = "client_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(128))
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_channel: Mapped[str] = mapped_column(String(32), default="Email")
+    last_request: Mapped[str] = mapped_column(Text, default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    booking_day: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    booking_time: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    booking_state: Mapped[str] = mapped_column(String(16), default="none")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class DailyUsageRow(Base):

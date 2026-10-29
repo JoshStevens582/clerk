@@ -86,6 +86,7 @@ def test_demo_examples_stay_available_after_open(demo_client: TestClient) -> Non
         "booking_thursday_10",
         "tax_return_email",
         "leave_hr_email",
+        "whatsapp_session_fee",
     ]
     opened = rows[0]
     handled = demo_client.post(
@@ -107,6 +108,7 @@ def test_demo_examples_stay_available_after_open(demo_client: TestClient) -> Non
         "booking_thursday_10",
         "tax_return_email",
         "leave_hr_email",
+        "whatsapp_session_fee",
     ]
     replacement = again_rows[0]
     assert replacement["id"] != opened["id"]
@@ -176,3 +178,10 @@ def test_clear_demo_mail_leaves_live_patient_mail(demo_client: TestClient) -> No
     live_rows = owner_outbox.json()
     assert any(row["to_email"] == "real@patient.co.za" for row in live_rows)
     assert all(row["to_email"] == "real@patient.co.za" for row in live_rows)
+
+    owner_records = demo_client.get("/api/records", headers=owner_headers)
+    assert owner_records.status_code == 200
+    assert any(row["email"] == "real@patient.co.za" for row in owner_records.json())
+    demo_records = demo_client.get("/api/records", headers=demo_headers)
+    assert demo_records.status_code == 200
+    assert all(row["email"] != "real@patient.co.za" for row in demo_records.json())

@@ -2,13 +2,16 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
 from clerk.api.deps import StaffDep
+from clerk.repositories.record_repo import RecordRepository
 from clerk.repositories.task_repo import TaskRepository
 from clerk.schemas.agent import PolicyOutcomeKind
-from clerk.schemas.api import MessageIn, MessageOut, OutboxItemOut, QueueItemOut
+from clerk.schemas.api import ClientRecordOut, MessageIn, MessageOut, OutboxItemOut, QueueItemOut
 from clerk.services.demo_accounts import is_demo_staff
+from clerk.services.inbox_seed import is_demo_contact
 from clerk.services.outbound_delivery import deliver_outbox_for_task
 from clerk.services.pages import PageStore
 from clerk.services.rate_limit import InMemoryRateLimiter, RateLimitExceeded
+from clerk.services.records import apply_task_decision, to_client_record_out
 from clerk.services.workflow import ClerkWorkflow
 
 router = APIRouter(prefix="/api", tags=["tasks"])
@@ -76,7 +79,20 @@ async def submit_message(payload: MessageIn, request: Request, staff: StaffDep) 
         message=result.message,
         auto_reply_text=result.auto_reply_text,
         queue_status=result.queue_status,
+        record=result.record,
     )
+
+
+@router.get("/records", response_model=list[ClientRecordOut])
+async def list_records(request: Request, staff: StaffDep) -> list[ClientRecordOut]:
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    settings = request.app.state.settings
+    demo_view = is_demo_staff(settings, staff.username)
+    with db_factory() as session:
+        rows = RecordRepository(session).list_recent()
+        if demo_view:
+            rows = [row for row in rows if is_demo_contact(row.email)]
+        return [to_client_record_out(row) for row in rows]
 
 
 @router.get("/queue", response_model=list[QueueItemOut])
@@ -108,6 +124,7 @@ async def list_queue(request: Request, staff: StaffDep) -> list[QueueItemOut]:
                     cited_pages=cited,
                     page_excerpts=excerpts,
                     slot_held=row.slot_held,
+                    reply_channel=row.reply_channel or "email",
                     created_at=row.created_at,
                 )
             )
@@ -127,6 +144,8 @@ async def approve_task(task_id: int, request: Request, staff: StaffDep) -> dict[
                 detail="Demo desk cannot approve live patient mail.",
             )
         row = repo.approve(task_id, resolved_by_username=staff.username)
+        if row is not None and row.status == "approved":
+            apply_task_decision(session, row, approved=True)
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
         if row.status != "approved":
@@ -156,6 +175,8 @@ async def reject_task(task_id: int, request: Request, staff: StaffDep) -> dict[s
                 detail="Demo desk cannot change live patient mail.",
             )
         row = repo.reject(task_id, resolved_by_username=staff.username)
+        if row is not None and row.status == "rejected":
+            apply_task_decision(session, row, approved=False)
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
         if row.status != "rejected":
@@ -182,6 +203,8 @@ async def list_outbox(request: Request, staff: StaffDep) -> list[OutboxItemOut]:
                 subject=row.subject,
                 body=row.body,
                 to_email=row.to_email,
+                channel=row.channel or "email",
+                to_phone=row.to_phone,
                 delivered=row.delivered,
                 delivery_error=row.delivery_error,
                 sent_at=row.sent_at,

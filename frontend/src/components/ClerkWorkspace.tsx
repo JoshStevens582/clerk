@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   createInboundMessage,
   resetDemoInbox,
+  type ClientRecord,
   type HealthStatus,
   type InboxMessage,
   type MessageResult,
@@ -19,7 +20,62 @@ const EXAMPLE_CAPTION: Record<string, string> = {
   booking_thursday_10: "Booking — waits for your approval",
   tax_return_email: "Client email — waits for your approval",
   leave_hr_email: "HR email — waits for your approval",
+  whatsapp_session_fee: "WhatsApp — waits for your approval",
 };
+
+function bookingStateLabel(state: ClientRecord["booking_state"]): string {
+  switch (state) {
+    case "prepared":
+      return "Prepared. Not held until you approve.";
+    case "held":
+      return "Held";
+    case "declined":
+      return "Declined. The slot was not held.";
+    default:
+      return "None";
+  }
+}
+
+function recordForMessage(
+  records: ClientRecord[],
+  selected: InboxMessage | null,
+  lastResult: MessageResult | null,
+): ClientRecord | null {
+  const email = selected?.fromEmail.trim().toLowerCase();
+  if (email) {
+    const match = records.find((row) => row.email?.toLowerCase() === email);
+    if (match) {
+      return match;
+    }
+  }
+  return lastResult?.record ?? null;
+}
+
+function ClientRecordCard({ record }: { record: ClientRecord | null }) {
+  if (!record) {
+    return null;
+  }
+  const when = [record.booking_day, record.booking_time].filter(Boolean).join(" ");
+  return (
+    <section className="source-card approval-card">
+      <header>
+        <strong>Client record</strong>
+        <span className="score">{record.last_channel}</span>
+      </header>
+      <p>
+        {record.display_name}
+        {record.email ? ` · ${record.email}` : ""}
+        {record.phone ? ` · ${record.phone}` : ""}
+      </p>
+      {record.booking_state !== "none" ? (
+        <p className="slot-line">
+          Booking{when ? ` ${when}` : ""}: <strong>{bookingStateLabel(record.booking_state)}</strong>
+        </p>
+      ) : null}
+      <p>{record.note}</p>
+    </section>
+  );
+}
 
 type ClerkWorkspaceProps = {
   user: StaffUser;
@@ -29,6 +85,7 @@ type ClerkWorkspaceProps = {
   inbox: InboxMessage[];
   queue: QueueItem[];
   outbox: OutboxItem[];
+  records: ClientRecord[];
   selected: InboxMessage | null;
   processedIds: Set<string>;
   lastResult: MessageResult | null;
@@ -52,6 +109,7 @@ export function ClerkWorkspace({
   inbox,
   queue,
   outbox,
+  records,
   selected,
   processedIds,
   lastResult,
@@ -74,6 +132,7 @@ export function ClerkWorkspace({
     subject: "",
     body: "",
     channel: "Email",
+    phone: "",
   });
   const [inboundError, setInboundError] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("desk");
@@ -90,7 +149,14 @@ export function ClerkWorkspace({
     setInboundError(null);
     try {
       await createInboundMessage(inboundForm);
-      setInboundForm({ from_name: "", from_email: "", subject: "", body: "", channel: "Email" });
+      setInboundForm({
+        from_name: "",
+        from_email: "",
+        subject: "",
+        body: "",
+        channel: "Email",
+        phone: "",
+      });
       setShowAddInbound(false);
       onInboxChanged();
     } catch (err) {
@@ -146,8 +212,8 @@ export function ClerkWorkspace({
         <p className="product-audience">For staff · approval before send</p>
         <p className="workspace-name">Demo clinic: Cape Town Physio</p>
         <p className="product-one-liner">
-          Not Counter (visitor chat) or Atlas (handbook) — this runs on patient email and your
-          outbox queue.
+          Not Counter or Atlas. Clerk checks your pages, updates the client record, and drafts
+          email or WhatsApp. You approve bookings and client messages before they go out.
         </p>
         {health?.inbound_address ? (
           <p className="muted-copy inbox-hint">
@@ -306,6 +372,27 @@ export function ClerkWorkspace({
               />
             </label>
             <label>
+              Channel
+              <select
+                value={inboundForm.channel}
+                onChange={(e) => setInboundForm({ ...inboundForm, channel: e.target.value })}
+              >
+                <option>Email</option>
+                <option>WhatsApp</option>
+                <option>Web form</option>
+              </select>
+            </label>
+            {inboundForm.channel === "WhatsApp" ? (
+              <label>
+                Phone
+                <input
+                  value={inboundForm.phone}
+                  placeholder="+27820000000"
+                  onChange={(e) => setInboundForm({ ...inboundForm, phone: e.target.value })}
+                />
+              </label>
+            ) : null}
+            <label>
               Message
               <textarea
                 required
@@ -403,7 +490,7 @@ export function ClerkWorkspace({
                   className={`step ${lastResult?.outcome_kind === "queued" ? "active" : lastResult ? "active" : ""}`}
                 >
                   <b>2. Act</b>
-                  Auto-send or draft
+                  Update the record, or draft email / WhatsApp
                 </div>
                 <div className={`step ${pending > 0 ? "active" : ""}`}>
                   <b>3. Approve</b>
@@ -415,8 +502,9 @@ export function ClerkWorkspace({
             <>
               <h1>Inbox desk</h1>
               <p>
-                Clerk reads patient mail, pulls facts from approved pages, and queues drafts — nothing
-                sends until staff approve.
+                Clerk checks the pages, updates the client record, and drafts a booking, email, or
+                WhatsApp. Agreed replies go out on their own. Bookings, prices, and client messages
+                wait for your yes.
               </p>
             </>
           )}
@@ -443,9 +531,14 @@ export function ClerkWorkspace({
                       <pre>{item.page_excerpts[page] ?? ""}</pre>
                     </details>
                   ))}
-                  <p className="slot-line">
-                    Slot held: <strong>{item.slot_held ? "Yes" : "No — until you approve"}</strong>
-                  </p>
+                  {item.kind === "booking_draft" ? (
+                    <p className="slot-line">
+                      Slot held: <strong>{item.slot_held ? "Yes" : "No. Until you approve."}</strong>
+                    </p>
+                  ) : null}
+                  {item.reply_channel === "whatsapp" ? (
+                    <p className="slot-line">WhatsApp stays in Sent until a WhatsApp connection exists.</p>
+                  ) : null}
                   <div className="approval-actions">
                     <button
                       type="button"
@@ -453,7 +546,7 @@ export function ClerkWorkspace({
                       disabled={busy}
                       onClick={() => onApprove(item.id)}
                     >
-                      Approve and send
+                      {item.reply_channel === "whatsapp" ? "Approve" : "Approve and send"}
                     </button>
                     <button
                       type="button"
@@ -478,7 +571,10 @@ export function ClerkWorkspace({
             <div className="empty">
               {demoDesk && inbox.length > 0 ? (
                 <>
-                  <p>Try an example. Clerk either sends the agreed reply or queues a draft for you.</p>
+                  <p>
+                    Try an example. Clerk updates the client record, sends an agreed reply, or queues
+                    a draft for you.
+                  </p>
                   <div className="stack">
                     {inbox.map((message) => (
                       <button
@@ -510,6 +606,10 @@ export function ClerkWorkspace({
             </div>
           ) : null}
 
+          {selected ? (
+            <ClientRecordCard record={recordForMessage(records, selected, lastResult)} />
+          ) : null}
+
           {lastResult && selected ? (
             <article className="bubble assistant">
               <p className="message-meta">Clerk</p>
@@ -536,7 +636,7 @@ export function ClerkWorkspace({
           </button>
         </div>
         {outbox.length === 0 ? (
-          <p className="muted-copy">Auto-replies and approved mail show here.</p>
+          <p className="muted-copy">Agreed replies and approved email or WhatsApp show here.</p>
         ) : (
           <div className="stack">
             {outbox.map((item) => (
@@ -545,7 +645,13 @@ export function ClerkWorkspace({
                   <strong>{kindLabel(item.kind)}</strong>
                   <span className="score">{new Date(item.sent_at).toLocaleString()}</span>
                 </header>
-                {item.to_email ? <p className="out-subject">To: {item.to_email}</p> : null}
+                {item.channel === "whatsapp" ? (
+                  <p className="out-subject">
+                    WhatsApp{item.to_phone ? ` · ${item.to_phone}` : ""}
+                  </p>
+                ) : item.to_email ? (
+                  <p className="out-subject">To: {item.to_email}</p>
+                ) : null}
                 {item.subject ? <p className="out-subject">{item.subject}</p> : null}
                 <p>{item.body}</p>
                 {item.delivery_error ? (

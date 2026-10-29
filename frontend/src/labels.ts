@@ -6,6 +6,8 @@ export function kindLabel(kind: string): string {
       return "Booking";
     case "email_draft":
       return "Email";
+    case "whatsapp_draft":
+      return "WhatsApp";
     default:
       return kind.replace(/_/g, " ");
   }

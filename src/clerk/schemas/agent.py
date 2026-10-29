@@ -8,6 +8,7 @@ class ProposalKind(StrEnum):
     AUTO_REPLY = "auto_reply"
     BOOKING_DRAFT = "booking_draft"
     EMAIL_DRAFT = "email_draft"
+    WHATSAPP_DRAFT = "whatsapp_draft"
     MISSING_FACT = "missing_fact"
 
 

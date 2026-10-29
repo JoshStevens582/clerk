@@ -40,7 +40,31 @@ DEMO_INBOX: list[dict[str, str | None]] = [
         "channel": "Email",
         "sample_id": "leave_hr_email",
     },
+    {
+        "from_name": "Thandi Jacobs",
+        "from_email": "demo+thandi@customchatandautomation.co.za",
+        "subject": "WhatsApp session fee",
+        "body": "Please WhatsApp me the standard session fee.",
+        "channel": "WhatsApp",
+        "sample_id": "whatsapp_session_fee",
+        "phone": "+27820000000",
+    },
 ]
+
+
+def demo_contact_emails() -> set[str]:
+    return {
+        str(item["from_email"]).strip().lower()
+        for item in DEMO_INBOX
+        if item.get("from_email")
+    }
+
+
+def is_demo_contact(email: str | None) -> bool:
+    if not email or not email.strip():
+        return False
+    key = email.strip().lower()
+    return key.startswith("demo+") or key in demo_contact_emails()
 
 
 def seed_demo_inbox(db_factory: sessionmaker[Session]) -> None:
@@ -63,6 +87,7 @@ def ensure_demo_inbox_samples(db_factory: sessionmaker[Session]) -> None:
                 subject=str(item["subject"]),
                 body=str(item["body"]),
                 channel=str(item["channel"]),
+                phone=str(item["phone"]) if item.get("phone") else None,
                 sample_id=sample_id,
                 source="demo",
             )

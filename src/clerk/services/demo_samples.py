@@ -5,6 +5,7 @@ SAMPLE_MESSAGES: dict[str, str] = {
     "booking_thursday_10": "Please book me for Thursday at 10:00.",
     "tax_return_email": "Email me what you need for the tax return.",
     "leave_hr_email": "Email HR that I want those 5 days carry-over leave.",
+    "whatsapp_session_fee": "Please WhatsApp me the standard session fee.",
 }
 
 
@@ -46,5 +47,15 @@ def result_for_sample(sample_id: str) -> ClerkRunResult | None:
             ),
             cited_pages=["leave-policy.md"],
             claimed_day_counts=["5 days"],
+        )
+    if sample_id == "whatsapp_session_fee":
+        return ClerkRunResult(
+            kind=ProposalKind.WHATSAPP_DRAFT,
+            draft_body=(
+                "The standard one-on-one session fee is R650, from the fees page. "
+                "This WhatsApp has not been sent."
+            ),
+            cited_pages=["fees.md"],
+            claimed_amounts=["R650"],
         )
     return None

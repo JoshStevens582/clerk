@@ -61,6 +61,16 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             task_alters.append("ALTER TABLE tasks ADD COLUMN inbound_subject VARCHAR(512)")
         if "reply_to_email" not in task_columns:
             task_alters.append("ALTER TABLE tasks ADD COLUMN reply_to_email VARCHAR(320)")
+        if "reply_channel" not in task_columns:
+            task_alters.append(
+                "ALTER TABLE tasks ADD COLUMN reply_channel VARCHAR(32) DEFAULT 'email'"
+            )
+        if "reply_phone" not in task_columns:
+            task_alters.append("ALTER TABLE tasks ADD COLUMN reply_phone VARCHAR(32)")
+        if "booking_day" not in task_columns:
+            task_alters.append("ALTER TABLE tasks ADD COLUMN booking_day VARCHAR(64)")
+        if "booking_time" not in task_columns:
+            task_alters.append("ALTER TABLE tasks ADD COLUMN booking_time VARCHAR(32)")
         if task_alters:
             with engine.begin() as connection:
                 for statement in task_alters:
@@ -78,6 +88,8 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             inbound_alters.append(
                 "ALTER TABLE inbound_messages ADD COLUMN external_id VARCHAR(128)"
             )
+        if "phone" not in inbound_columns:
+            inbound_alters.append("ALTER TABLE inbound_messages ADD COLUMN phone VARCHAR(32)")
         if inbound_alters:
             with engine.begin() as connection:
                 for statement in inbound_alters:
@@ -91,6 +103,12 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             outbox_alters.append("ALTER TABLE outbox ADD COLUMN delivered BOOLEAN DEFAULT 0")
         if "delivery_error" not in outbox_columns:
             outbox_alters.append("ALTER TABLE outbox ADD COLUMN delivery_error VARCHAR(512)")
+        if "channel" not in outbox_columns:
+            outbox_alters.append(
+                "ALTER TABLE outbox ADD COLUMN channel VARCHAR(32) DEFAULT 'email'"
+            )
+        if "to_phone" not in outbox_columns:
+            outbox_alters.append("ALTER TABLE outbox ADD COLUMN to_phone VARCHAR(32)")
         if outbox_alters:
             with engine.begin() as connection:
                 for statement in outbox_alters:

@@ -963,6 +963,7 @@ button.ghost {
 
 .inbound-form input,
 .inbound-form textarea,
+.inbound-form select,
 .add-staff-form input,
 .add-staff-form select {
   font: inherit;

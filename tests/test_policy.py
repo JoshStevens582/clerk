@@ -77,6 +77,33 @@ def test_leave_days_must_match_page(policy: PolicyService) -> None:
     assert outcome.kind == PolicyOutcomeKind.QUEUED
 
 
+def test_whatsapp_draft_waits_for_approval(policy: PolicyService) -> None:
+    proposal = AgentProposal(
+        kind=ProposalKind.WHATSAPP_DRAFT,
+        inbound_text="Please WhatsApp me the standard session fee.",
+        draft_body="The standard session fee is R650, from the fees page.",
+        cited_pages=["fees.md"],
+        claimed_amounts=["R650"],
+    )
+    outcome = policy.apply(proposal)
+    assert outcome.kind == PolicyOutcomeKind.QUEUED
+    assert outcome.slot_held is False
+    assert outcome.message == "Nothing has been sent yet. Press Approve."
+
+
+def test_whatsapp_invented_price_refused(policy: PolicyService) -> None:
+    proposal = AgentProposal(
+        kind=ProposalKind.WHATSAPP_DRAFT,
+        inbound_text="WhatsApp me the fee",
+        draft_body="The fee is R999.",
+        cited_pages=["fees.md"],
+        claimed_amounts=["R999"],
+    )
+    outcome = policy.apply(proposal)
+    assert outcome.kind == PolicyOutcomeKind.BLOCKED
+    assert outcome.block_reason == "invented_price"
+
+
 def test_invented_leave_days_refused(policy: PolicyService) -> None:
     proposal = AgentProposal(
         kind=ProposalKind.EMAIL_DRAFT,

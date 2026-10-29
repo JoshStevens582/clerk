@@ -34,6 +34,10 @@ class TaskRepository:
         inbound_text: str,
         outcome: PolicyOutcome,
         reply_to_email: str | None = None,
+        reply_channel: str = "email",
+        reply_phone: str | None = None,
+        booking_day: str | None = None,
+        booking_time: str | None = None,
         inbound_subject: str | None = None,
         inbound_message_id: int | None = None,
     ) -> TaskRow:
@@ -52,6 +56,10 @@ class TaskRepository:
             inbound_message_id=inbound_message_id,
             inbound_subject=inbound_subject,
             reply_to_email=reply_to_email.strip().lower() if reply_to_email else None,
+            reply_channel=reply_channel if reply_channel in {"email", "whatsapp"} else "email",
+            reply_phone=reply_phone.strip() if reply_phone and reply_phone.strip() else None,
+            booking_day=booking_day,
+            booking_time=booking_time,
             draft_subject=outcome.draft_subject,
             draft_body=outcome.draft_body,
             cited_pages_json=json.dumps(outcome.cited_pages),
@@ -70,6 +78,8 @@ class TaskRepository:
                 body=outcome.auto_reply_text,
                 source_task_id=row.id,
                 to_email=row.reply_to_email,
+                channel=row.reply_channel,
+                to_phone=row.reply_phone if row.reply_channel == "whatsapp" else None,
             )
             row.resolved_at = datetime.now(tz=UTC)
         return row
@@ -144,6 +154,8 @@ class TaskRepository:
             body=send_body,
             source_task_id=row.id,
             to_email=row.reply_to_email,
+            channel=row.reply_channel,
+            to_phone=row.reply_phone if row.reply_channel == "whatsapp" else None,
         )
         return row
 
@@ -199,12 +211,16 @@ class TaskRepository:
         body: str,
         source_task_id: int,
         to_email: str | None = None,
+        channel: str = "email",
+        to_phone: str | None = None,
     ) -> OutboxRow:
         row = OutboxRow(
             kind=kind,
             subject=subject,
             body=body,
             to_email=to_email.strip().lower() if to_email else None,
+            channel=channel if channel in {"email", "whatsapp"} else "email",
+            to_phone=to_phone.strip() if to_phone and to_phone.strip() else None,
             source_task_id=source_task_id,
         )
         self._session.add(row)

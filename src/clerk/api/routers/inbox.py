@@ -4,11 +4,16 @@ from sqlalchemy.orm import Session, sessionmaker
 from clerk.api.deps import ManagerDep, StaffDep
 from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.models import InboundMessageRow
+from clerk.repositories.record_repo import RecordRepository
 from clerk.repositories.task_repo import TaskRepository
 from clerk.schemas.api import CreateInboundIn, InboundMessageOut
 from clerk.schemas.auth import MessageOut
 from clerk.services.demo_accounts import is_demo_staff
-from clerk.services.inbox_seed import ensure_demo_inbox_samples, ordered_demo_samples
+from clerk.services.inbox_seed import (
+    demo_contact_emails,
+    ensure_demo_inbox_samples,
+    ordered_demo_samples,
+)
 
 router = APIRouter(prefix="/api/inbox", tags=["inbox"])
 
@@ -21,6 +26,7 @@ def _inbound_out(row: InboundMessageRow) -> InboundMessageOut:
         subject=row.subject,
         body=row.body,
         channel=row.channel,
+        phone=row.phone,
         sample_id=row.sample_id,
         handled=row.task_id is not None,
         created_at=row.created_at,
@@ -62,6 +68,7 @@ async def create_inbound(
             subject=payload.subject,
             body=payload.body,
             channel=payload.channel,
+            phone=payload.phone,
         )
         session.commit()
         session.refresh(row)
@@ -80,6 +87,7 @@ async def clear_demo_mail(request: Request, staff: StaffDep) -> MessageOut:
     db_factory: sessionmaker[Session] = request.app.state.db_factory
     with db_factory() as session:
         TaskRepository(session).clear_demo_mail()
+        RecordRepository(session).delete_demo_contacts(demo_contact_emails())
         session.commit()
     return MessageOut(message="Demo mail cleared. Real patient mail was left in place.")
 

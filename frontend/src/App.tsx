@@ -8,6 +8,7 @@ import {
   fetchMe,
   fetchOutbox,
   fetchQueue,
+  fetchRecords,
   fetchSession,
   logout,
   type StaffUser,
@@ -17,6 +18,7 @@ import {
   type HealthStatus,
   type InboxMessage,
   type MessageResult,
+  type ClientRecord,
   type OutboxItem,
   type QueueItem,
 } from "./api";
@@ -35,6 +37,7 @@ export function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  const [records, setRecords] = useState<ClientRecord[]>([]);
   const [inbox, setInbox] = useState<InboxMessage[]>([]);
   const [selected, setSelected] = useState<InboxMessage | null>(null);
   const [processedIds, setProcessedIds] = useState<Set<string>>(() => new Set());
@@ -42,16 +45,18 @@ export function App() {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [q, o, h, i] = await Promise.all([
+    const [q, o, h, i, clientRecords] = await Promise.all([
       fetchQueue(),
       fetchOutbox(),
       fetchHealth(),
       fetchInbox(),
+      fetchRecords(),
     ]);
     setQueue(q);
     setOutbox(o);
     setHealth(h);
     setInbox(i);
+    setRecords(clientRecords);
   }, []);
 
   async function loadMe() {
@@ -80,6 +85,7 @@ export function App() {
     setPeopleOpen(false);
     setQueue([]);
     setOutbox([]);
+    setRecords([]);
     setInbox([]);
     setLastResult(null);
     setSelected(null);
@@ -239,6 +245,7 @@ export function App() {
       inbox={inbox}
       queue={queue}
       outbox={outbox}
+      records={records}
       selected={selected}
       processedIds={processedIds}
       lastResult={lastResult}

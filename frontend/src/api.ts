@@ -8,6 +8,7 @@ export type QueueItem = {
   cited_pages: string[];
   page_excerpts: Record<string, string>;
   slot_held: boolean;
+  reply_channel: string;
   created_at: string;
 };
 
@@ -17,6 +18,8 @@ export type OutboxItem = {
   subject: string | null;
   body: string;
   to_email: string | null;
+  channel: string;
+  to_phone: string | null;
   delivered: boolean;
   delivery_error: string | null;
   sent_at: string;
@@ -34,12 +37,27 @@ export type InboxMessage = {
   channel: string;
 };
 
+export type ClientRecord = {
+  id: number;
+  display_name: string;
+  email: string | null;
+  phone: string | null;
+  last_channel: string;
+  last_request: string;
+  note: string;
+  booking_day: string | null;
+  booking_time: string | null;
+  booking_state: "none" | "prepared" | "held" | "declined";
+  updated_at: string;
+};
+
 export type MessageResult = {
   task_id: number;
   outcome_kind: string;
   message: string;
   auto_reply_text: string | null;
   queue_status: string | null;
+  record: ClientRecord | null;
 };
 
 export type HealthStatus = {
@@ -563,6 +581,7 @@ export async function createInboundMessage(payload: {
   subject: string;
   body: string;
   channel?: string;
+  phone?: string;
 }): Promise<InboxMessage> {
   const row = await api<{
     id: number;
@@ -623,6 +642,10 @@ export async function submitMessage(
 
 export async function fetchQueue(): Promise<QueueItem[]> {
   return api("/api/queue");
+}
+
+export async function fetchRecords(): Promise<ClientRecord[]> {
+  return api("/api/records");
 }
 
 export async function approveTask(taskId: number): Promise<void> {

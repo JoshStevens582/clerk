@@ -58,6 +58,19 @@ async def deliver_outbox_for_task(
             return False
         if outbox.delivered:
             return True
+        if (outbox.channel or "email").strip().lower() == "whatsapp":
+            if demo_dry_run:
+                outbox.delivered = True
+                outbox.delivery_error = "Demo desk. Not sent on WhatsApp."
+            else:
+                outbox.delivered = False
+                outbox.delivery_error = (
+                    "WhatsApp is not connected. Saved to the outbox only. "
+                    "Nothing was sent to a phone."
+                )
+            session.commit()
+            logger.info("outbound whatsapp saved task_id=%s", task_id)
+            return bool(outbox.delivered)
         to_email = (outbox.to_email or task.reply_to_email or "").strip()
         if not to_email:
             outbox.delivery_error = "No recipient email on this message."
