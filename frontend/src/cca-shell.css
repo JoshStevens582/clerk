@@ -143,12 +143,34 @@ a {
 }
 
 @media (max-width: 900px) {
-  .app {
-    grid-template-columns: 1fr;
+  .app,
+  .app:not(.app--sent-collapsed),
+  .app.app--sent-collapsed {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     height: 100dvh;
     padding: 8px;
     gap: 8px;
+    overflow: hidden;
+  }
+
+  .app .mobile-pane-tabs {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .app .sidebar,
+  .app .main,
+  .app .sources,
+  .app:not(.app--sent-collapsed) .sidebar,
+  .app:not(.app--sent-collapsed) .main,
+  .app:not(.app--sent-collapsed) .sources,
+  .app.app--sent-collapsed .sidebar,
+  .app.app--sent-collapsed .main {
+    grid-column: 1;
+    grid-row: 2;
+    max-height: none;
+    min-width: 0;
   }
 
   .mobile-pane-tabs {
@@ -234,6 +256,20 @@ a {
   .chat-header p {
     font-size: 13px;
     overflow-wrap: anywhere;
+  }
+
+  .chat-header {
+    padding: 14px 14px 8px;
+  }
+
+  .people-row,
+  .people-actions,
+  .recovery-actions {
+    flex-wrap: wrap;
+  }
+
+  .login-card {
+    padding: 20px 16px;
   }
 }
 
