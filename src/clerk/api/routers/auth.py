@@ -315,6 +315,11 @@ async def update_email(
     request: Request,
     staff: StaffDep,
 ) -> StaffUserOut:
+    if is_demo_staff(request.app.state.settings, staff.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Shared demo accounts cannot set a reset email.",
+        )
     normalized = payload.email.strip().lower()
     if not normalized or "@" not in normalized:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email.")
