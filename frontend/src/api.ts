@@ -64,6 +64,7 @@ export type HealthStatus = {
   status: string;
   openai_configured: boolean;
   smtp_configured: boolean;
+  whatsapp_configured: boolean;
   inbound_automation_ready: boolean;
   inbound_resend_api_full_access: boolean;
   inbound_webhook_configured: boolean;

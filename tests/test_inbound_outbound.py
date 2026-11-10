@@ -210,4 +210,4 @@ def test_whatsapp_approval_does_not_email(
 
     records = client.get("/api/records", headers=owner_auth)
     thandi = next(row for row in records.json() if row["email"] == "thandi@example.com")
-    assert "not sent to a phone" in thandi["note"].lower()
+    assert thandi["note"] == "WhatsApp approved and placed in the outbox."

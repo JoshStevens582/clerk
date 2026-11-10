@@ -56,6 +56,15 @@ class Settings(BaseSettings):
     resend_webhook_secret: str = ""
     clerk_inbound_address: str = ""
     clerk_seed_demo_inbox: bool = True
+    # WhatsApp Cloud API (Meta). Send needs the token and phone number id.
+    # Inbound needs the app secret (signature) and the verify token (webhook setup).
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_app_secret: str = ""
+    whatsapp_verify_token: str = ""
+    whatsapp_api_version: str = "v23.0"
+    # Leading 0 on a local number is replaced with this code (South Africa).
+    whatsapp_default_country_code: str = "27"
     # Workflow / patient message caps (SQLite counters, separate from auth Redis limits)
     rate_limit_per_minute: int = 10
     rate_limit_per_day: int = 40

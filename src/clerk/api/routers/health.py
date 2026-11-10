@@ -11,6 +11,7 @@ from clerk.services.resend_inbound import (
     inbound_automation_ready,
     resend_webhook_configured,
 )
+from clerk.services.whatsapp import whatsapp_send_configured
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -85,6 +86,7 @@ async def health(request: Request) -> HealthOut:
     return HealthOut(
         openai_configured=settings.openai_configured,
         smtp_configured=smtp_configured(settings),
+        whatsapp_configured=whatsapp_send_configured(settings),
         inbound_automation_ready=automation_ready,
         inbound_resend_api_full_access=full_access,
         inbound_webhook_configured=webhook,
