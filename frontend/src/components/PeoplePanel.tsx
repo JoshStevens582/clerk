@@ -83,7 +83,7 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
                 username,
                 password: newStaff.password,
                 role: newStaff.role,
-                email: newStaff.email.trim() || null,
+                email: newStaff.email.trim(),
               });
               setNewStaff({ username: "", password: "", role: "staff", email: "" });
               setShowAddStaff(false);
@@ -129,8 +129,9 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
             </select>
           </label>
           <label>
-            Email (optional — for password reset)
+            Email (for password reset)
             <input
+              required
               type="email"
               value={newStaff.email}
               onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
@@ -149,7 +150,7 @@ export function PeoplePanel({ signedInUsername, onBack }: PeoplePanelProps) {
               <span>
                 {person.role}
                 {!person.active ? " · disabled" : ""}
-                {person.email ? ` · ${person.email}` : ""}
+                {person.email ? ` · ${person.email}` : " · no reset email"}
                 {person.mfa_enabled ? " · authenticator on" : ""}
               </span>
             </div>

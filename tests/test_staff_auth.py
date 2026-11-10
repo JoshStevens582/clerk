@@ -84,7 +84,9 @@ def test_manager_can_create_a_staff_user(client: TestClient, owner_auth: dict[st
             "username": "physio1",
             "password": "another-pass-99",
             "role": "staff",
+            "email": " Physio1@Example.com ",
         },
     )
     assert created.status_code == 201
     assert created.json()["username"] == "physio1"
+    assert created.json()["email"] == "physio1@example.com"

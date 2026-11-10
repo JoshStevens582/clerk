@@ -17,11 +17,23 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--role", choices=("staff", "manager"), default="staff")
     parser.add_argument("--display-name", default=None)
     parser.add_argument(
+        "--email",
+        default=None,
+        help="Password reset address. Required for new users.",
+    )
+    parser.add_argument(
         "--password",
         default=None,
         help="Set on the server only; omit locally to be prompted.",
     )
     args = parser.parse_args(argv)
+
+    email: str | None = None
+    if args.email is not None:
+        email = args.email.strip().lower()
+        if "@" not in email:
+            print("Use a valid email address.", file=sys.stderr)
+            raise SystemExit(1)
 
     if args.password is not None:
         password = args.password
@@ -45,19 +57,32 @@ def main(argv: list[str] | None = None) -> None:
     with factory() as session:
         repo = StaffRepository(session)
         existing = repo.get_by_username(username)
+        if email is not None:
+            owner = repo.get_by_email(email)
+            if owner is not None and (existing is None or owner.id != existing.id):
+                print("That email is in use by another user.", file=sys.stderr)
+                raise SystemExit(1)
         if existing is not None:
             existing.password_hash = hash_password(password)
             existing.active = True
             if args.role == "manager" or existing.role == "manager":
                 existing.role = role if args.role == "manager" else existing.role
+            if email is not None:
+                existing.email = email
             session.commit()
             print(f"Updated password for staff user {username} ({existing.role}).")
+            if existing.email is None:
+                print("Warning: no reset email. Add one with --email.", file=sys.stderr)
             return
+        if email is None:
+            print("Use --email so this user can reset a forgotten password.", file=sys.stderr)
+            raise SystemExit(1)
         repo.create_user(
             username=username,
             password_hash=hash_password(password),
             role=role,
             display_name=args.display_name,
+            email=email,
         )
         session.commit()
     print(f"Created staff user {username} ({role}).")

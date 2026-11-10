@@ -530,6 +530,14 @@ export function ClerkWorkspace({
         </header>
 
         <div className="workspace-body">
+          {!user.email && !demoDesk ? (
+            <p className="error banner">
+              Your account has no reset email. If you forget your password you cannot reset it.{" "}
+              <button type="button" className="pill" onClick={onOpenSecurity}>
+                Add reset email
+              </button>
+            </p>
+          ) : null}
           {error ? <p className="error banner">{error}</p> : null}
 
           {queue.length > 0 ? (

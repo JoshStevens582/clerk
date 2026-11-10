@@ -44,6 +44,11 @@ async def create_staff_user(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="That username is already in use.",
             )
+        if repo.get_by_email(payload.email) is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="That email is in use.",
+            )
         row = repo.create_user(
             username=payload.username,
             password_hash=hash_password(payload.password),

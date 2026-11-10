@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 StaffRole = Literal["staff", "manager"]
 
@@ -29,4 +29,12 @@ class CreateStaffIn(BaseModel):
     password: str = Field(min_length=8, max_length=256)
     role: StaffRole = "staff"
     display_name: str | None = Field(default=None, max_length=128)
-    email: str | None = Field(default=None, max_length=320)
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized:
+            raise ValueError("A valid email address is required for password reset.")
+        return normalized
