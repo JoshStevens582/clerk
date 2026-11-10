@@ -246,6 +246,15 @@ export function ClerkWorkspace({
                 ? "SMTP ready"
                 : "SMTP not set"}
           </span>
+          <span
+            className={`pill ${health === null ? "" : health.whatsapp_configured ? "ok" : "warn"}`}
+          >
+            {health === null
+              ? "WhatsApp…"
+              : health.whatsapp_configured
+                ? "WhatsApp ready"
+                : "WhatsApp not set"}
+          </span>
           <span className={`pill ${pending > 0 ? "warn" : "ok"}`}>
             {pending} awaiting approval
           </span>

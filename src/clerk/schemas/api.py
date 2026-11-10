@@ -113,6 +113,7 @@ class HealthOut(BaseModel):
     status: Literal["ok"] = "ok"
     openai_configured: bool
     smtp_configured: bool
+    whatsapp_configured: bool = False
     inbound_automation_ready: bool
     inbound_resend_api_full_access: bool
     inbound_webhook_configured: bool

@@ -49,7 +49,7 @@ def approval_note(
             return f"Booking approved. {when} is now held."
         return "Booking approved. The slot is now held."
     if reply_channel == "whatsapp" or kind == ProposalKind.WHATSAPP_DRAFT.value:
-        return "WhatsApp approved and placed in the outbox. It was not sent to a phone."
+        return "WhatsApp approved and placed in the outbox."
     return "Email approved and placed in the outbox."
 
 

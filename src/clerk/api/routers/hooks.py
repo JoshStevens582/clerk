@@ -3,7 +3,8 @@ import logging
 import secrets
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session, sessionmaker
 
 from clerk.repositories.inbound_repo import InboundRepository
@@ -13,6 +14,8 @@ from clerk.schemas.auth import MessageOut
 from clerk.services.inbound_processing import run_clerk_on_inbound
 from clerk.services.resend_inbound import verify_svix_signature
 from clerk.services.resend_receive import ingest_resend_received_email
+from clerk.services.whatsapp import parse_inbound_texts, verify_meta_signature
+from clerk.services.whatsapp_receive import run_clerk_on_whatsapp, store_inbound_whatsapp
 
 router = APIRouter(prefix="/api/hooks", tags=["hooks"])
 logger = logging.getLogger("clerk.hooks")
@@ -124,3 +127,62 @@ async def resend_inbound_webhook(
 @router.get("/resend/health", response_model=MessageOut)
 async def resend_hook_health() -> MessageOut:
     return MessageOut(message="Resend webhook endpoint is reachable.")
+
+
+@router.get("/whatsapp", response_class=PlainTextResponse)
+async def whatsapp_webhook_verify(
+    request: Request,
+    mode: str = Query(default="", alias="hub.mode"),
+    verify_token: str = Query(default="", alias="hub.verify_token"),
+    challenge: str = Query(default="", alias="hub.challenge"),
+) -> str:
+    """Meta calls this once when the webhook URL is saved in the app dashboard."""
+    expected = request.app.state.settings.whatsapp_verify_token.strip()
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="WhatsApp webhook is not configured.",
+        )
+    if mode != "subscribe" or not secrets.compare_digest(verify_token, expected):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Verification failed.")
+    return challenge
+
+
+@router.post("/whatsapp")
+async def whatsapp_inbound_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> dict[str, bool]:
+    settings = request.app.state.settings
+    app_secret = settings.whatsapp_app_secret.strip()
+    if not app_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="WhatsApp webhook is not configured.",
+        )
+    body = await request.body()
+    if not verify_meta_signature(
+        body=body,
+        app_secret=app_secret,
+        signature_header=request.headers.get("x-hub-signature-256", ""),
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature.",
+        )
+    try:
+        event: Any = json.loads(body.decode())
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON.",
+        ) from exc
+
+    messages, skipped = parse_inbound_texts(event)
+    if skipped:
+        logger.info("whatsapp webhook skipped non-text messages count=%s", skipped)
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    inbound_ids = store_inbound_whatsapp(db_factory, messages)
+    if inbound_ids:
+        background_tasks.add_task(run_clerk_on_whatsapp, request.app, inbound_ids=inbound_ids)
+    return {"ok": True}

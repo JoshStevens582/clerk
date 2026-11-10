@@ -8,6 +8,8 @@ from clerk.services.pages import PageStore
 from clerk.services.policy import PolicyService
 
 TEST_AUTH_SECRET = "test-clerk-auth-secret-at-least-32-bytes"
+WHATSAPP_TEST_APP_SECRET = "test-whatsapp-app-secret"
+WHATSAPP_TEST_VERIFY_TOKEN = "test-whatsapp-verify-token"
 
 
 @pytest.fixture
@@ -26,6 +28,10 @@ def client(tmp_path) -> TestClient:
     os.environ["RATE_LIMIT_ENABLED"] = "false"
     os.environ["PAGES_DIR"] = "pages"
     os.environ["OPENAI_API_KEY"] = ""
+    os.environ["WHATSAPP_ACCESS_TOKEN"] = ""
+    os.environ["WHATSAPP_PHONE_NUMBER_ID"] = ""
+    os.environ["WHATSAPP_APP_SECRET"] = WHATSAPP_TEST_APP_SECRET
+    os.environ["WHATSAPP_VERIFY_TOKEN"] = WHATSAPP_TEST_VERIFY_TOKEN
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
