@@ -17,6 +17,15 @@ from clerk.services.agent import ClerkAgentService
 from clerk.services.policy import PolicyService
 from clerk.services.records import handling_note, to_client_record_out
 
+_ANSWERED_OUTCOMES = {PolicyOutcomeKind.QUEUED, PolicyOutcomeKind.SENT_AUTO}
+
+
+def unanswered_note(kind: PolicyOutcomeKind, message: str) -> str:
+    """Inbox note for a message Clerk could not answer from the pages."""
+    if kind == PolicyOutcomeKind.NEEDS_INFO:
+        return f"Clerk could not answer from your pages: {message}"
+    return f"Clerk stopped its draft: {message}"
+
 
 class WorkflowResult:
     def __init__(
@@ -66,6 +75,7 @@ class ClerkWorkflow:
         resolved_name = from_name.strip() if from_name and from_name.strip() else None
         resolved_channel = display_channel(channel)
         resolved_phone = normalize_phone(phone, strict=False)
+        inbound_is_sample = False
 
         if inbound_id is not None:
             with self._db_factory() as session:
@@ -82,6 +92,7 @@ class ClerkWorkflow:
                 resolved_name = inbound.from_name
                 resolved_channel = display_channel(inbound.channel)
                 resolved_phone = normalize_phone(inbound.phone, strict=False)
+                inbound_is_sample = inbound.sample_id is not None
 
         run_result = await self._agent.interpret(
             text,
@@ -141,7 +152,13 @@ class ClerkWorkflow:
                 )
                 record = to_client_record_out(record_row)
             if inbound_id is not None:
-                InboundRepository(session).mark_handled(inbound_id, task_id=row.id)
+                inbound_repo = InboundRepository(session)
+                if inbound_is_sample or outcome.kind in _ANSWERED_OUTCOMES:
+                    inbound_repo.mark_handled(inbound_id, task_id=row.id)
+                else:
+                    inbound_repo.keep_open_with_note(
+                        inbound_id, note=unanswered_note(outcome.kind, outcome.message)
+                    )
             session.commit()
             queue_status = cast(QueueStatus, row.status)
             task_id = row.id

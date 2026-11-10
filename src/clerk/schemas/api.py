@@ -27,6 +27,7 @@ class InboundMessageOut(BaseModel):
     phone: str | None = None
     sample_id: str | None = None
     handled: bool
+    clerk_note: str | None = None
     created_at: datetime
 
 

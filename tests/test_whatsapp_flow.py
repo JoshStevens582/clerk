@@ -271,7 +271,9 @@ def test_webhook_stores_the_message_once_and_runs_clerk(client: TestClient) -> N
         assert row.phone == "+27820000000"
         assert row.from_name == "Thandi"
         assert row.body == "What is the session fee?"
-        assert row.task_id is not None
+        assert row.task_id is None
+        assert row.clerk_note is not None
+        assert row.clerk_note.startswith("Clerk could not answer from your pages:")
         same = [
             r
             for r in InboundRepository(session).list_recent(limit=500)

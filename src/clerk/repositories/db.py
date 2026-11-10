@@ -90,6 +90,10 @@ def _apply_sqlite_migrations(engine: Engine) -> None:
             )
         if "phone" not in inbound_columns:
             inbound_alters.append("ALTER TABLE inbound_messages ADD COLUMN phone VARCHAR(32)")
+        if "clerk_note" not in inbound_columns:
+            inbound_alters.append(
+                "ALTER TABLE inbound_messages ADD COLUMN clerk_note VARCHAR(512)"
+            )
         if inbound_alters:
             with engine.begin() as connection:
                 for statement in inbound_alters:

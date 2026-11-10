@@ -92,6 +92,8 @@ type ClerkWorkspaceProps = {
   busy: boolean;
   error: string | null;
   onSelectInbox: (message: InboxMessage) => void;
+  onAskAgain: (message: InboxMessage) => void;
+  onMarkDone: (message: InboxMessage) => void;
   onApprove: (taskId: number) => void;
   onReject: (taskId: number) => void;
   onOpenSecurity: () => void;
@@ -116,6 +118,8 @@ export function ClerkWorkspace({
   busy,
   error,
   onSelectInbox,
+  onAskAgain,
+  onMarkDone,
   onApprove,
   onReject,
   onOpenSecurity,
@@ -125,6 +129,10 @@ export function ClerkWorkspace({
   onClearDemoMail,
 }: ClerkWorkspaceProps) {
   const pending = queue.length;
+  const clerkAnswered =
+    lastResult?.outcome_kind === "queued" || lastResult?.outcome_kind === "sent_auto";
+  const needsYou =
+    selected !== null && !demoDesk && (lastResult ? !clerkAnswered : Boolean(selected.clerkNote));
   const [showAddInbound, setShowAddInbound] = useState(false);
   const [inboundForm, setInboundForm] = useState({
     from_name: "",
@@ -313,7 +321,7 @@ export function ClerkWorkspace({
         <p className="muted-copy inbox-hint">
           {demoDesk
             ? "Open any example. It stays in this list so you can try it again."
-            : "Messages disappear after you open them once. Approvals stay in the list above until you approve or reject."}
+            : "Messages leave this list once Clerk drafts or answers them. If Clerk cannot answer from your pages, the message stays here marked Needs you until you press Mark done."}
         </p>
         {demoDesk && onClearDemoMail ? (
           <button
@@ -440,7 +448,9 @@ export function ClerkWorkspace({
                     <small>
                       {demoDesk && caption
                         ? caption
-                        : `${message.from} · ${message.receivedLabel}${handled ? " · Handled" : ""}`}
+                        : `${message.from} · ${message.receivedLabel}${
+                            message.clerkNote ? " · Needs you" : handled ? " · Handled" : ""
+                          }`}
                     </small>
                   </span>
                 </button>
@@ -546,7 +556,11 @@ export function ClerkWorkspace({
                     </p>
                   ) : null}
                   {item.reply_channel === "whatsapp" ? (
-                    <p className="slot-line">WhatsApp stays in Sent until a WhatsApp connection exists.</p>
+                    <p className="slot-line">
+                      {health?.whatsapp_configured && !demoDesk
+                        ? "Approve sends this WhatsApp to the customer's phone."
+                        : "WhatsApp is not connected here. Approve puts it in Sent only."}
+                    </p>
                   ) : null}
                   <div className="approval-actions">
                     <button
@@ -628,6 +642,37 @@ export function ClerkWorkspace({
               ) : null}
             </article>
           ) : null}
+
+          {needsYou && selected ? (
+            <section className="source-card approval-card">
+              <header>
+                <strong>Needs you</strong>
+              </header>
+              {!lastResult && selected.clerkNote ? <p>{selected.clerkNote}</p> : null}
+              <p className="muted-copy">
+                Nothing was sent. Reply to the customer yourself, or add the answer to your pages
+                and ask Clerk again.
+              </p>
+              <div className="approval-actions">
+                <button
+                  type="button"
+                  className="send"
+                  disabled={busy}
+                  onClick={() => onAskAgain(selected)}
+                >
+                  Ask Clerk again
+                </button>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  disabled={busy}
+                  onClick={() => onMarkDone(selected)}
+                >
+                  Mark done
+                </button>
+              </div>
+            </section>
+          ) : null}
         </div>
       </main>
 
@@ -666,7 +711,9 @@ export function ClerkWorkspace({
                 {item.delivery_error ? (
                   <p className="muted-copy">{item.delivery_error}</p>
                 ) : item.delivered ? (
-                  <p className="pill ok">Delivered via SMTP</p>
+                  <p className="pill ok">
+                    {item.channel === "whatsapp" ? "Delivered on WhatsApp" : "Delivered via SMTP"}
+                  </p>
                 ) : null}
               </div>
             ))}

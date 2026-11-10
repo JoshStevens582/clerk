@@ -117,5 +117,15 @@ class InboundRepository:
         if row is None:
             return None
         row.task_id = task_id
+        row.clerk_note = None
+        self._session.flush()
+        return row
+
+    def keep_open_with_note(self, inbound_id: int, *, note: str) -> InboundMessageRow | None:
+        """Leave the message in the inbox and say why Clerk could not answer it."""
+        row = self.get(inbound_id)
+        if row is None:
+            return None
+        row.clerk_note = note[:512]
         self._session.flush()
         return row

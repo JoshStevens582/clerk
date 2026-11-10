@@ -135,6 +135,15 @@ class TaskRepository:
     def get(self, task_id: int) -> TaskRow | None:
         return self._session.get(TaskRow, task_id)
 
+    def latest_for_inbound(self, inbound_id: int) -> TaskRow | None:
+        stmt = (
+            select(TaskRow)
+            .where(TaskRow.inbound_message_id == inbound_id)
+            .order_by(TaskRow.id.desc())
+            .limit(1)
+        )
+        return self._session.scalar(stmt)
+
     def approve(self, task_id: int, *, resolved_by_username: str | None = None) -> TaskRow | None:
         row = self.get(task_id)
         if row is None or row.status != "pending":
