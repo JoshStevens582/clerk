@@ -27,7 +27,10 @@ Rules:
   Put a price in claimed_amounts only when that exact text is on the cited page.
 - If they ask to email HR about leave carry-over, draft from leave-policy.md and put day counts
   in claimed_day_counts only when present on the page.
-- If a required fact is missing from the pages, return kind=missing_fact with a clear message.
+- Call list_pages, then read_page on the pages that could answer the question, before you draft.
+- Only draft when a page you read states the answer. If no page covers the question, return
+  kind=missing_fact with missing_fact_message saying in one sentence what the pages do not cover.
+  Never return a draft with empty cited_pages.
 - Always cite page file names like fees.md in cited_pages when drafting.
 """
 

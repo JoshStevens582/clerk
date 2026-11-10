@@ -93,6 +93,7 @@ class InboundMessageRow(Base):
     source: Mapped[str] = mapped_column(String(32), default="manual")
     external_id: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
     task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    clerk_note: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 

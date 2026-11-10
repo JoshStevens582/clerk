@@ -29,6 +29,7 @@ def _inbound_out(row: InboundMessageRow) -> InboundMessageOut:
         phone=row.phone,
         sample_id=row.sample_id,
         handled=row.task_id is not None,
+        clerk_note=row.clerk_note,
         created_at=row.created_at,
     )
 
@@ -73,6 +74,33 @@ async def create_inbound(
         session.commit()
         session.refresh(row)
         return _inbound_out(row)
+
+
+@router.post("/{inbound_id}/done", response_model=MessageOut)
+async def mark_inbound_done(inbound_id: int, request: Request, staff: StaffDep) -> MessageOut:
+    """Take a message Clerk could not answer off the list once a person has dealt with it."""
+    settings = request.app.state.settings
+    if is_demo_staff(settings, staff.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo desk is read-only for inbound mail.",
+        )
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        inbound_repo = InboundRepository(session)
+        inbound = inbound_repo.get(inbound_id)
+        if inbound is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+        if inbound.task_id is None:
+            latest = TaskRepository(session).latest_for_inbound(inbound_id)
+            if latest is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Clerk has not looked at this message yet. Open it first.",
+                )
+            inbound_repo.mark_handled(inbound_id, task_id=latest.id)
+            session.commit()
+    return MessageOut(message="Marked done.")
 
 
 @router.post("/clear-demo-mail", response_model=MessageOut)

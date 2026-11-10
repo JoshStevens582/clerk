@@ -11,6 +11,7 @@ import {
   fetchRecords,
   fetchSession,
   logout,
+  markInboxDone,
   type StaffUser,
   rejectTask,
   startSessionMaintenance,
@@ -93,7 +94,32 @@ export function App() {
     setHealth(null);
   }
 
-  async function handleSelectInbox(message: InboxMessage) {
+  function handleSelectInbox(message: InboxMessage) {
+    if (message.clerkNote) {
+      setSelected(message);
+      setLastResult(null);
+      setError(null);
+      return;
+    }
+    void runClerk(message);
+  }
+
+  async function handleMarkDone(message: InboxMessage) {
+    setBusy(true);
+    setError(null);
+    try {
+      await markInboxDone(message.id);
+      setSelected(null);
+      setLastResult(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not mark done.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runClerk(message: InboxMessage) {
     setSelected(message);
     setBusy(true);
     setError(null);
@@ -251,7 +277,9 @@ export function App() {
       lastResult={lastResult}
       busy={busy}
       error={error}
-      onSelectInbox={(message) => void handleSelectInbox(message)}
+      onSelectInbox={handleSelectInbox}
+      onAskAgain={(message) => void runClerk(message)}
+      onMarkDone={(message) => void handleMarkDone(message)}
       onApprove={handleApprove}
       onReject={handleReject}
       onOpenSecurity={() => {

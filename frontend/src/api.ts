@@ -35,6 +35,7 @@ export type InboxMessage = {
   receivedLabel: string;
   body: string;
   channel: string;
+  clerkNote: string | null;
 };
 
 export type ClientRecord = {
@@ -536,6 +537,7 @@ function mapInbound(row: {
   body: string;
   channel: string;
   sample_id: string | null;
+  clerk_note?: string | null;
   created_at: string;
 }): InboxMessage {
   return {
@@ -546,6 +548,7 @@ function mapInbound(row: {
     subject: row.subject,
     body: row.body,
     channel: row.channel,
+    clerkNote: row.clerk_note ?? null,
     receivedLabel: formatInboxTime(row.created_at),
   };
 }
@@ -560,10 +563,15 @@ export async function fetchInbox(): Promise<InboxMessage[]> {
       body: string;
       channel: string;
       sample_id: string | null;
+      clerk_note: string | null;
       created_at: string;
     }[]
   >("/api/inbox");
   return rows.map(mapInbound);
+}
+
+export async function markInboxDone(inboundId: number): Promise<void> {
+  await api(`/api/inbox/${inboundId}/done`, { method: "POST" });
 }
 
 export async function clearDemoMail(): Promise<string> {
