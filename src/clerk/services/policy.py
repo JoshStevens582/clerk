@@ -34,25 +34,30 @@ class PolicyService:
         )
 
     def _apply_auto_reply(self, proposal: AgentProposal) -> PolicyOutcome:
-        reply_id = proposal.auto_reply_id
-        if not reply_id:
+        reply_ids = list(proposal.auto_reply_ids) or (
+            [proposal.auto_reply_id] if proposal.auto_reply_id else []
+        )
+        if not reply_ids:
             return PolicyOutcome(
                 kind=PolicyOutcomeKind.BLOCKED,
                 message="No approved reply id was provided.",
                 block_reason="missing_auto_reply_id",
             )
         catalog = self._pages.load_approved_replies()
-        reply = catalog.by_id(reply_id)
-        if reply is None:
-            return PolicyOutcome(
-                kind=PolicyOutcomeKind.BLOCKED,
-                message=f"Unknown approved reply: {reply_id}",
-                block_reason="unknown_auto_reply",
-            )
+        parts: list[str] = []
+        for reply_id in reply_ids:
+            reply = catalog.by_id(reply_id)
+            if reply is None:
+                return PolicyOutcome(
+                    kind=PolicyOutcomeKind.BLOCKED,
+                    message=f"Unknown approved reply: {reply_id}",
+                    block_reason="unknown_auto_reply",
+                )
+            parts.append(reply.text)
         return PolicyOutcome(
             kind=PolicyOutcomeKind.SENT_AUTO,
             message="Agreed reply sent.",
-            auto_reply_text=reply.text,
+            auto_reply_text="\n\n".join(parts),
         )
 
     def _apply_draft(self, proposal: AgentProposal) -> PolicyOutcome:

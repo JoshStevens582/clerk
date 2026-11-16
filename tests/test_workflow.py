@@ -199,8 +199,11 @@ async def test_whatsapp_booking_without_a_draft_sends_the_stored_limit(
     )
     assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
     assert result.auto_reply_text == (
-        "I can help with the session fee, opening hours, and booking a day and time. "
-        "Tell me the day and time, or a person will reply."
+        "Ask one of these and I will answer: What is the session fee? "
+        "What are your opening hours? What do you treat? "
+        "What documents do you need for a tax return? "
+        "To book, tell me the day and the time, for example Tuesday at 10. "
+        "A person replies to anything else."
     )
     with repaired._db_factory() as session:
         task = session.get(TaskRow, result.task_id)
@@ -209,6 +212,42 @@ async def test_whatsapp_booking_without_a_draft_sends_the_stored_limit(
         assert task.reply_phone == "+27720510267"
         assert task.auto_reply_text == result.auto_reply_text
         assert task.slot_held is False
+
+
+@pytest.mark.asyncio
+async def test_available_times_sends_the_hours(workflow: ClerkWorkflow) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _EmptyDraftAgent()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "I want to book a session. what day and times are available?",
+        reply_to_email="james@example.com",
+        channel="Email",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.queue_status == "sent_auto"
+    assert result.auto_reply_text is not None
+    assert "Monday to Friday" in result.auto_reply_text
+    assert "close at 5:00 PM" in result.auto_reply_text
+    assert "no list of open appointment times" in result.auto_reply_text
+    assert "Ask one of these" not in result.auto_reply_text
+
+
+@pytest.mark.asyncio
+async def test_fee_and_hours_send_both_stored_sentences(workflow: ClerkWorkflow) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _EmptyDraftAgent()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "What is the session fee and what are your opening hours?",
+        reply_to_email="james@example.com",
+        channel="Email",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.auto_reply_text is not None
+    assert "R650" in result.auto_reply_text
+    assert "Monday to Friday" in result.auto_reply_text
+    fee, hours = result.auto_reply_text.split("\n\n")
+    assert fee.startswith("A standard one-on-one physiotherapy session is R650.")
+    assert hours.startswith("We are open Monday to Friday")
 
 
 @pytest.mark.asyncio

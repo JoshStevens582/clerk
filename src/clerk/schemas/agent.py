@@ -18,6 +18,7 @@ class AgentProposal(BaseModel):
     kind: ProposalKind
     inbound_text: str = ""
     auto_reply_id: str | None = None
+    auto_reply_ids: list[str] = Field(default_factory=list)
     draft_subject: str | None = None
     draft_body: str | None = None
     cited_pages: list[str] = Field(default_factory=list)

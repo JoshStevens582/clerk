@@ -22,6 +22,30 @@ _ANSWERED_OUTCOMES = {PolicyOutcomeKind.QUEUED, PolicyOutcomeKind.SENT_AUTO}
 
 
 _BOOKING_ASK = re.compile(r"\b(?:book|booking|appointment)\b", re.IGNORECASE)
+_APPROVED_QUESTIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("session_fee", re.compile(r"\b(?:fees?|costs?|prices?|how much)\b", re.IGNORECASE)),
+    (
+        "opening_hours",
+        re.compile(
+            r"\b(?:opening hours|business hours|are you open|when are you open|"
+            r"when do you (?:open|close)|closing time|what times?|what days?|"
+            r"availability|times are available|days are available)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "services_offered",
+        re.compile(
+            r"\b(?:what do you (?:treat|offer)|what services|services do you|"
+            r"do you treat|sports injury)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "tax_documents",
+        re.compile(r"\b(?:tax return|tax documents|irp5|it3)\b", re.IGNORECASE),
+    ),
+)
 _WEEKDAY = re.compile(
     r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
     re.IGNORECASE,
@@ -103,21 +127,17 @@ def _queued_booking(proposal: AgentProposal, day: str, clock: str) -> AgentPropo
     )
 
 
-def _repair_incomplete_booking(proposal: AgentProposal) -> AgentProposal:
-    """A named day and time waits for approval. Anything else gets the stored limit sentence."""
-    if not _asks_to_book(proposal.inbound_text):
-        return proposal
-    has_slot = bool((proposal.booking_day or "").strip() and (proposal.booking_time or "").strip())
-    has_draft = bool(proposal.cited_pages and (proposal.draft_body or "").strip())
-    if has_slot and has_draft:
-        return proposal
-    named_slot = _slot_from_text(proposal.inbound_text)
-    if named_slot is not None:
-        return _queued_booking(proposal, named_slot[0], named_slot[1])
+def _approved_question_ids(text: str) -> list[str]:
+    return [reply_id for reply_id, pattern in _APPROVED_QUESTIONS if pattern.search(text)]
+
+
+def _stored_auto_reply(proposal: AgentProposal, reply_ids: list[str]) -> AgentProposal:
+    """Send the exact stored sentences. The model does not write them."""
     return proposal.model_copy(
         update={
             "kind": ProposalKind.AUTO_REPLY,
-            "auto_reply_id": "what_clerk_can_answer",
+            "auto_reply_id": reply_ids[0],
+            "auto_reply_ids": reply_ids,
             "draft_subject": None,
             "draft_body": None,
             "cited_pages": [],
@@ -128,6 +148,32 @@ def _repair_incomplete_booking(proposal: AgentProposal) -> AgentProposal:
             "missing_fact_message": None,
         }
     )
+
+
+def _repair_incomplete_booking(
+    proposal: AgentProposal,
+    *,
+    answer_questions: bool,
+) -> AgentProposal:
+    """A named day and time waits for approval. Approved questions send their stored answer."""
+    text = proposal.inbound_text
+    if _asks_to_book(text):
+        day = (proposal.booking_day or "").strip()
+        clock = (proposal.booking_time or "").strip()
+        has_slot = bool(day and clock)
+        has_draft = bool(proposal.cited_pages and (proposal.draft_body or "").strip())
+        if has_slot and has_draft:
+            return proposal
+        named_slot = _slot_from_text(text)
+        if named_slot is not None:
+            return _queued_booking(proposal, named_slot[0], named_slot[1])
+    if answer_questions:
+        question_ids = _approved_question_ids(text)
+        if question_ids:
+            return _stored_auto_reply(proposal, question_ids)
+    if _asks_to_book(text):
+        return _stored_auto_reply(proposal, ["what_clerk_can_answer"])
+    return proposal
 
 
 def unanswered_note(kind: PolicyOutcomeKind, message: str) -> str:
@@ -213,7 +259,10 @@ class ClerkWorkflow:
         proposal = proposal.model_copy(
             update={"kind": draft_kind_for_channel(proposal.kind, resolved_channel)}
         )
-        proposal = _repair_incomplete_booking(proposal)
+        proposal = _repair_incomplete_booking(
+            proposal,
+            answer_questions=resolved_sample_id is None and not inbound_is_sample,
+        )
         outcome = self._policy.apply(proposal)
         reply_channel = outbound_channel_name(
             proposal_kind=proposal.kind,

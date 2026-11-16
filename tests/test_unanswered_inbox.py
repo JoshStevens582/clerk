@@ -39,13 +39,16 @@ def _run_clerk(
 def test_unanswered_message_sends_the_stored_limit(
     client: TestClient, owner_auth: dict[str, str]
 ) -> None:
-    body = "What services do you offer?"
+    body = "Do you have parking?"
     inbound_id = _add_inbound(client, owner_auth, body)
     result = _run_clerk(client, owner_auth, inbound_id, body, None)
     assert result["outcome_kind"] == "sent_auto"
     assert result["auto_reply_text"] == (
-        "I can help with the session fee, opening hours, and booking a day and time. "
-        "Tell me the day and time, or a person will reply."
+        "Ask one of these and I will answer: What is the session fee? "
+        "What are your opening hours? What do you treat? "
+        "What documents do you need for a tax return? "
+        "To book, tell me the day and the time, for example Tuesday at 10. "
+        "A person replies to anything else."
     )
     open_ids = [row["id"] for row in client.get("/api/inbox", headers=owner_auth).json()]
     assert inbound_id not in open_ids

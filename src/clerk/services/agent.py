@@ -22,11 +22,19 @@ Rules:
   Set booking_day to that weekday and booking_time to that time.
   Cite fees.md and hours.md. Put R650 in claimed_amounts only if fees.md contains it.
   Never set slot as held. A WhatsApp booking stays kind=booking_draft.
-- If they ask to book but do not give both a weekday and a time, return kind=auto_reply
-  with auto_reply_id=what_clerk_can_answer. Do not write your own wording.
-- If they ask for an email about tax return documents, draft from tax-return-documents.md only.
-- If the inbound channel is WhatsApp and they are not asking to book, or they ask for a
-  WhatsApp, return kind=whatsapp_draft with the message in draft_body. Cite page file names.
+- If they ask what the session costs, return kind=auto_reply with auto_reply_id=session_fee.
+- If they ask opening hours, what days you are open, or what times are available,
+  return kind=auto_reply with auto_reply_id=opening_hours. Do not invent open slots.
+- If they ask what you treat or what services you offer, return kind=auto_reply
+  with auto_reply_id=services_offered.
+- If they ask which documents a tax return needs, return kind=auto_reply
+  with auto_reply_id=tax_documents. Do not draft your own list.
+- If they ask to book but do not give both a weekday and a time, and they did not ask
+  one of those questions, return kind=auto_reply with auto_reply_id=what_clerk_can_answer.
+  Do not write your own wording.
+- If the inbound channel is WhatsApp and they did not ask the fee, the hours, the services,
+  or the tax documents, and they are not asking to book, return kind=whatsapp_draft.
+  Cite page file names.
   Do not send it. Put a price in claimed_amounts only when that exact text is on the cited page.
 - If they ask to email HR about leave carry-over, draft from leave-policy.md and put day counts
   in claimed_day_counts only when present on the page.

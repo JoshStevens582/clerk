@@ -63,8 +63,11 @@ def test_invented_price_refused(policy: PolicyService) -> None:
     assert outcome.kind == PolicyOutcomeKind.SENT_AUTO
     assert outcome.block_reason == "invented_price"
     assert outcome.auto_reply_text == (
-        "I can help with the session fee, opening hours, and booking a day and time. "
-        "Tell me the day and time, or a person will reply."
+        "Ask one of these and I will answer: What is the session fee? "
+        "What are your opening hours? What do you treat? "
+        "What documents do you need for a tax return? "
+        "To book, tell me the day and the time, for example Tuesday at 10. "
+        "A person replies to anything else."
     )
 
 
@@ -79,6 +82,21 @@ def test_leave_days_must_match_page(policy: PolicyService) -> None:
     )
     outcome = policy.apply(proposal)
     assert outcome.kind == PolicyOutcomeKind.QUEUED
+
+
+def test_two_approved_questions_send_both_sentences(policy: PolicyService) -> None:
+    proposal = AgentProposal(
+        kind=ProposalKind.AUTO_REPLY,
+        inbound_text="What is the session fee and what are your opening hours?",
+        auto_reply_id="session_fee",
+        auto_reply_ids=["session_fee", "opening_hours"],
+    )
+    outcome = policy.apply(proposal)
+    assert outcome.kind == PolicyOutcomeKind.SENT_AUTO
+    assert outcome.auto_reply_text is not None
+    assert "R650" in outcome.auto_reply_text
+    assert "Monday to Friday" in outcome.auto_reply_text
+    assert "\n\n" in outcome.auto_reply_text
 
 
 def test_whatsapp_draft_waits_for_approval(policy: PolicyService) -> None:
