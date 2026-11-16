@@ -50,16 +50,11 @@ _APPROVED_QUESTIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
             re.IGNORECASE,
         ),
     ),
-    (
-        "tax_documents",
-        re.compile(r"\b(?:tax(?: return| documents)?|irp5|it3)\b", re.IGNORECASE),
-    ),
 )
 _PAGE_REPLIES: tuple[tuple[str, str], ...] = (
     ("fees.md", "session_fee"),
     ("hours.md", "opening_hours"),
     ("services.md", "services_offered"),
-    ("tax-return-documents.md", "tax_documents"),
 )
 _WEEKDAY = re.compile(
     r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
@@ -142,6 +137,18 @@ def _queued_booking(proposal: AgentProposal, day: str, clock: str) -> AgentPropo
     )
 
 
+_TAX_TOPIC = re.compile(r"\b(?:tax|irp5|it3)\b", re.IGNORECASE)
+
+
+def _mentions_tax(proposal: AgentProposal) -> bool:
+    """Tax returns are not a customer topic for this practice."""
+    if proposal.auto_reply_id == "tax_documents" or "tax_documents" in proposal.auto_reply_ids:
+        return True
+    if "tax-return-documents.md" in proposal.cited_pages:
+        return True
+    return _TAX_TOPIC.search(proposal.inbound_text) is not None
+
+
 def _approved_question_ids(text: str) -> list[str]:
     return [reply_id for reply_id, pattern in _APPROVED_QUESTIONS if pattern.search(text)]
 
@@ -183,6 +190,8 @@ def _repair_incomplete_booking(
 ) -> AgentProposal:
     """A named day and time waits for approval. Approved questions send their stored answer."""
     text = proposal.inbound_text
+    if answer_questions and _mentions_tax(proposal):
+        return _stored_auto_reply(proposal, ["what_clerk_can_answer"])
     if _asks_to_book(text):
         day = (proposal.booking_day or "").strip()
         clock = (proposal.booking_time or "").strip()

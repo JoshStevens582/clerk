@@ -6,7 +6,7 @@
     },
     {
       "id": "what_clerk_can_answer",
-      "text": "I can tell you the session fee, when we are open, and what we treat. I can also tell you which documents a tax return needs. To book, say which day and what time suits you. Ask in your own words. A person replies to anything else."
+      "text": "I can tell you the session fee, when we are open, and what we treat. To book, say which day and what time suits you. Ask in your own words. A person replies to anything else."
     },
     {
       "id": "session_fee",
@@ -19,10 +19,6 @@
     {
       "id": "services_offered",
       "text": "We treat adults for sports injury assessment and rehabilitation, post-operative physiotherapy, neck, back, and shoulder pain, dry needling, manual therapy, and home exercise programmes. We do not run a paediatric ward or an emergency service. This is what we offer, not a list of open times. To book, tell me the day and the time, for example Tuesday at 10."
-    },
-    {
-      "id": "tax_documents",
-      "text": "When we prepare your personal tax return, please provide your IRP5 or IT3(a) from each employer for the tax year, bank statements for interest earned, a medical aid tax certificate if you have one, retirement annuity contribution certificates, proof of donations to registered public benefit organisations, a rental income schedule if you let property, and a travel logbook if you claim a travel allowance. We do not start work until we have these items or a written list of what is still outstanding."
     }
   ]
 }

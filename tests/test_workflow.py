@@ -200,7 +200,6 @@ async def test_whatsapp_booking_without_a_draft_sends_the_stored_limit(
     assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
     assert result.auto_reply_text == (
         "I can tell you the session fee, when we are open, and what we treat. "
-        "I can also tell you which documents a tax return needs. "
         "To book, say which day and what time suits you. "
         "Ask in your own words. A person replies to anything else."
     )
@@ -245,6 +244,22 @@ class _ShoulderDraftAgent:
             draft_body="We can help with that shoulder. I will write this in my own words.",
             cited_pages=["services.md"],
         )
+
+
+@pytest.mark.asyncio
+async def test_a_tax_question_does_not_get_a_tax_answer(workflow: ClerkWorkflow) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _EmptyDraftAgent()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "What documents do you need for my tax return?",
+        reply_to_email="james@example.com",
+        channel="Email",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.auto_reply_text is not None
+    assert "tax" not in result.auto_reply_text.lower()
+    assert "IRP5" not in result.auto_reply_text
+    assert "session fee" in result.auto_reply_text
 
 
 @pytest.mark.asyncio

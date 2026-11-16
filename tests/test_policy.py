@@ -64,7 +64,6 @@ def test_invented_price_refused(policy: PolicyService) -> None:
     assert outcome.block_reason == "invented_price"
     assert outcome.auto_reply_text == (
         "I can tell you the session fee, when we are open, and what we treat. "
-        "I can also tell you which documents a tax return needs. "
         "To book, say which day and what time suits you. "
         "Ask in your own words. A person replies to anything else."
     )

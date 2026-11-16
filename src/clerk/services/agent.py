@@ -29,8 +29,7 @@ Rules:
   with auto_reply_id=opening_hours. Do not invent open slots.
 - Any wording about pain, an injury, or what the practice treats returns kind=auto_reply
   with auto_reply_id=services_offered.
-- Any wording about tax documents returns kind=auto_reply with auto_reply_id=tax_documents.
-  Do not draft your own list.
+- Do not use tax-return-documents.md. A question about tax gets what_clerk_can_answer.
 - If they ask to book but do not give both a weekday and a time, and none of those topics
   fit, return kind=auto_reply with auto_reply_id=what_clerk_can_answer.
   Do not write your own wording.
