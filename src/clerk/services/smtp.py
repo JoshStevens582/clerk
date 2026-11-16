@@ -26,11 +26,13 @@ async def send_plain_email(
         logger.warning("SMTP missing smtp_from/smtp_username")
         return False, "SMTP_FROM is not set."
 
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = sender
-    message["To"] = to_address
-    message.set_content(body)
+    message = build_outbound_message(
+        settings,
+        to_address=to_address,
+        subject=subject,
+        sender=sender,
+        body=body,
+    )
 
     try:
         await asyncio.to_thread(_smtp_send, settings, message)
@@ -39,6 +41,26 @@ async def send_plain_email(
         logger.warning("SMTP send failed to=%s: %s", to_address, detail)
         return False, detail
     return True, None
+
+
+def build_outbound_message(
+    settings: Settings,
+    *,
+    to_address: str,
+    subject: str,
+    sender: str,
+    body: str,
+) -> EmailMessage:
+    """A reply to a Clerk email goes to the inbound address, not noreply@."""
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = sender
+    message["To"] = to_address
+    reply_to = settings.clerk_inbound_address.strip()
+    if "@" in reply_to:
+        message["Reply-To"] = reply_to
+    message.set_content(body)
+    return message
 
 
 def _smtp_send(settings: Settings, message: EmailMessage) -> None:
