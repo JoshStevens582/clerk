@@ -603,8 +603,8 @@ export function ClerkWorkspace({
               {demoDesk && inbox.length > 0 ? (
                 <>
                   <p>
-                    Try an example. Clerk updates the client record, sends an agreed reply, or queues
-                    a draft for you.
+                    Click an example. Clerk drafts the reply on this desk. Press Approve to finish
+                    the practice. Nothing is emailed or sent on WhatsApp.
                   </p>
                   <div className="stack">
                     {inbox.map((message) => (

@@ -4,7 +4,7 @@ from clerk.repositories.db import create_db_engine, init_db, session_factory
 from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.models import TaskRow
 from clerk.repositories.record_repo import RecordRepository
-from clerk.schemas.agent import PolicyOutcomeKind, ProposalKind
+from clerk.schemas.agent import ClerkRunResult, PolicyOutcomeKind, ProposalKind
 from clerk.schemas.channel import draft_kind_for_channel
 from clerk.services.agent import ClerkAgentService
 from clerk.services.pages import PageStore
@@ -66,6 +66,149 @@ async def test_booking_updates_record_without_holding_slot(workflow: ClerkWorkfl
     assert result.record.booking_day == "Thursday"
     assert result.record.booking_time == "10:00"
     assert "not held" in result.record.note.lower()
+
+
+class _EmptyDraftAgent:
+    async def interpret(
+        self,
+        text: str,
+        *,
+        sample_id: str | None = None,
+        channel: str | None = None,
+    ) -> ClerkRunResult:
+        del text, sample_id, channel
+        return ClerkRunResult(kind=ProposalKind.WHATSAPP_DRAFT, draft_body="", cited_pages=[])
+
+
+class _LimitSentenceAgent:
+    async def interpret(
+        self,
+        text: str,
+        *,
+        sample_id: str | None = None,
+        channel: str | None = None,
+    ) -> ClerkRunResult:
+        del text, sample_id, channel
+        return ClerkRunResult(
+            kind=ProposalKind.AUTO_REPLY,
+            auto_reply_id="what_clerk_can_answer",
+        )
+
+
+@pytest.mark.asyncio
+async def test_tuesday_at_10_waits_for_approval(workflow: ClerkWorkflow) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _LimitSentenceAgent()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "Can you please book me on Tuesday at 10",
+        channel="WhatsApp",
+        phone="+27820000000",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.QUEUED
+    assert result.queue_status == "pending"
+    assert result.auto_reply_text is None
+    with repaired._db_factory() as session:
+        task = session.get(TaskRow, result.task_id)
+        assert task is not None
+        assert task.kind == "booking_draft"
+        assert task.status == "pending"
+        assert task.booking_day == "Tuesday"
+        assert task.booking_time == "10:00"
+        assert task.reply_channel == "whatsapp"
+        assert task.slot_held is False
+        assert task.draft_body is not None
+        assert "R650" in task.draft_body
+        assert "Time not held until approved." in task.draft_body
+
+
+@pytest.mark.asyncio
+async def test_booking_on_a_day_without_a_time_sends_the_limit(
+    workflow: ClerkWorkflow,
+) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _LimitSentenceAgent()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "Can you please book me on Tuesday",
+        channel="WhatsApp",
+        phone="+27820000000",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.queue_status == "sent_auto"
+
+
+class _CitedBookingWithoutTime:
+    async def interpret(
+        self,
+        text: str,
+        *,
+        sample_id: str | None = None,
+        channel: str | None = None,
+    ) -> ClerkRunResult:
+        del text, sample_id, channel
+        return ClerkRunResult(
+            kind=ProposalKind.BOOKING_DRAFT,
+            draft_body=(
+                "A standard session is R650. We are open Monday to Friday. "
+                "Reply with the day and time you want."
+            ),
+            cited_pages=["fees.md", "hours.md"],
+            claimed_amounts=["R650"],
+        )
+
+
+@pytest.mark.asyncio
+async def test_booking_without_a_time_sends_the_stored_limit(
+    workflow: ClerkWorkflow,
+) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _CitedBookingWithoutTime()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "I would like to book a session",
+        reply_to_email="",
+        channel="WhatsApp",
+        phone="+27720510267",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.auto_reply_text is not None
+    assert "R650" not in result.auto_reply_text
+    assert result.queue_status == "sent_auto"
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_booking_without_a_draft_sends_the_stored_limit(
+    workflow: ClerkWorkflow,
+) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _EmptyDraftAgent()  # type: ignore[assignment]
+    with repaired._db_factory() as session:
+        inbound = InboundRepository(session).create(
+            from_name="Tester",
+            from_email="",
+            subject="WhatsApp message",
+            body="I would like to book a session",
+            channel="WhatsApp",
+            phone="+27720510267",
+            source="whatsapp",
+        )
+        session.commit()
+        inbound_id = inbound.id
+
+    result = await repaired.handle_message(
+        "I would like to book a session",
+        inbound_id=inbound_id,
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.auto_reply_text == (
+        "I can help with the session fee, opening hours, and booking a day and time. "
+        "Tell me the day and time, or a person will reply."
+    )
+    with repaired._db_factory() as session:
+        task = session.get(TaskRow, result.task_id)
+        assert task is not None
+        assert task.reply_channel == "whatsapp"
+        assert task.reply_phone == "+27720510267"
+        assert task.auto_reply_text == result.auto_reply_text
+        assert task.slot_held is False
 
 
 @pytest.mark.asyncio
@@ -229,6 +372,8 @@ def test_decision_without_inbound_or_email(workflow: ClerkWorkflow) -> None:
 
 def test_email_draft_on_whatsapp_channel_changes_kind() -> None:
     email_on_whatsapp = draft_kind_for_channel(ProposalKind.EMAIL_DRAFT, "WhatsApp")
+    whatsapp_on_email = draft_kind_for_channel(ProposalKind.WHATSAPP_DRAFT, "Email")
     booking_on_whatsapp = draft_kind_for_channel(ProposalKind.BOOKING_DRAFT, "WhatsApp")
     assert email_on_whatsapp == ProposalKind.WHATSAPP_DRAFT
+    assert whatsapp_on_email == ProposalKind.EMAIL_DRAFT
     assert booking_on_whatsapp == ProposalKind.BOOKING_DRAFT

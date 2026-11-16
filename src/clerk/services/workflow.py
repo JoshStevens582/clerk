@@ -1,3 +1,4 @@
+import re
 from typing import cast
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -5,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.record_repo import RecordRepository
 from clerk.repositories.task_repo import TaskRepository
-from clerk.schemas.agent import PolicyOutcomeKind, ProposalKind, QueueStatus
+from clerk.schemas.agent import AgentProposal, PolicyOutcomeKind, ProposalKind, QueueStatus
 from clerk.schemas.api import ClientRecordOut
 from clerk.schemas.channel import (
     display_channel,
@@ -18,6 +19,115 @@ from clerk.services.policy import PolicyService
 from clerk.services.records import handling_note, to_client_record_out
 
 _ANSWERED_OUTCOMES = {PolicyOutcomeKind.QUEUED, PolicyOutcomeKind.SENT_AUTO}
+
+
+_BOOKING_ASK = re.compile(r"\b(?:book|booking|appointment)\b", re.IGNORECASE)
+_WEEKDAY = re.compile(
+    r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+    re.IGNORECASE,
+)
+_CLOCK = re.compile(
+    r"\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b"
+    r"|\b(\d{1,2}):(\d{2})\s*(am|pm)?\b"
+    r"|\b(\d{1,2})\s*(am|pm)\b",
+    re.IGNORECASE,
+)
+
+
+def _asks_to_book(text: str) -> bool:
+    return _BOOKING_ASK.search(text) is not None
+
+
+def _format_clock(hour: int, minute: int, meridiem: str | None) -> str | None:
+    if not 0 <= minute <= 59:
+        return None
+    marker = (meridiem or "").lower()
+    if marker in {"am", "pm"}:
+        if not 1 <= hour <= 12:
+            return None
+        suffix = "AM" if marker == "am" else "PM"
+        return f"{hour}:{minute:02d} {suffix}"
+    if not 0 <= hour <= 23:
+        return None
+    return f"{hour}:{minute:02d}"
+
+
+def _clock_from_match(match: re.Match[str]) -> str | None:
+    if match.group(1) is not None:
+        hour = int(match.group(1))
+        minute = int(match.group(2) or "0")
+        meridiem = match.group(3)
+    elif match.group(4) is not None:
+        hour = int(match.group(4))
+        minute = int(match.group(5) or "0")
+        meridiem = match.group(6)
+    else:
+        hour = int(match.group(7) or "0")
+        minute = 0
+        meridiem = match.group(8)
+    return _format_clock(hour, minute, meridiem)
+
+
+def _slot_from_text(text: str) -> tuple[str, str] | None:
+    """Weekday and clock written by the customer. The model does not get to drop them."""
+    day_match = _WEEKDAY.search(text)
+    if day_match is None:
+        return None
+    for clock_match in _CLOCK.finditer(text):
+        clock = _clock_from_match(clock_match)
+        if clock is not None:
+            return day_match.group(1).title(), clock
+    return None
+
+
+def _queued_booking(proposal: AgentProposal, day: str, clock: str) -> AgentProposal:
+    """Draft only the fee and hours from the pages, plus the day and time they named."""
+    return proposal.model_copy(
+        update={
+            "kind": ProposalKind.BOOKING_DRAFT,
+            "auto_reply_id": None,
+            "draft_subject": f"Booking request — {day} {clock}",
+            "draft_body": (
+                f"You asked for {day} at {clock}. "
+                "A standard session is R650. "
+                "We are open Monday to Friday and close at 5:00 PM. "
+                "Time not held until approved."
+            ),
+            "cited_pages": ["fees.md", "hours.md"],
+            "claimed_amounts": ["R650"],
+            "claimed_day_counts": [],
+            "booking_day": day,
+            "booking_time": clock,
+            "missing_fact_message": None,
+        }
+    )
+
+
+def _repair_incomplete_booking(proposal: AgentProposal) -> AgentProposal:
+    """A named day and time waits for approval. Anything else gets the stored limit sentence."""
+    if not _asks_to_book(proposal.inbound_text):
+        return proposal
+    has_slot = bool((proposal.booking_day or "").strip() and (proposal.booking_time or "").strip())
+    has_draft = bool(proposal.cited_pages and (proposal.draft_body or "").strip())
+    if has_slot and has_draft:
+        return proposal
+    named_slot = _slot_from_text(proposal.inbound_text)
+    if named_slot is not None:
+        return _queued_booking(proposal, named_slot[0], named_slot[1])
+    return proposal.model_copy(
+        update={
+            "kind": ProposalKind.AUTO_REPLY,
+            "auto_reply_id": "what_clerk_can_answer",
+            "draft_subject": None,
+            "draft_body": None,
+            "cited_pages": [],
+            "claimed_amounts": [],
+            "claimed_day_counts": [],
+            "booking_day": None,
+            "booking_time": None,
+            "missing_fact_message": None,
+        }
+    )
 
 
 def unanswered_note(kind: PolicyOutcomeKind, message: str) -> str:
@@ -103,6 +213,7 @@ class ClerkWorkflow:
         proposal = proposal.model_copy(
             update={"kind": draft_kind_for_channel(proposal.kind, resolved_channel)}
         )
+        proposal = _repair_incomplete_booking(proposal)
         outcome = self._policy.apply(proposal)
         reply_channel = outbound_channel_name(
             proposal_kind=proposal.kind,

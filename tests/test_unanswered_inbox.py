@@ -36,26 +36,19 @@ def _run_clerk(
     return result
 
 
-def _inbox_row(client: TestClient, auth: dict[str, str], inbound_id: int) -> dict[str, object]:
-    rows = client.get("/api/inbox", headers=auth).json()
-    matches = [row for row in rows if row["id"] == inbound_id]
-    assert len(matches) == 1
-    row: dict[str, object] = matches[0]
-    return row
-
-
-def test_unanswered_message_stays_in_the_inbox_with_a_note(
+def test_unanswered_message_sends_the_stored_limit(
     client: TestClient, owner_auth: dict[str, str]
 ) -> None:
     body = "What services do you offer?"
     inbound_id = _add_inbound(client, owner_auth, body)
     result = _run_clerk(client, owner_auth, inbound_id, body, None)
-    assert result["outcome_kind"] == "needs_info"
-
-    row = _inbox_row(client, owner_auth, inbound_id)
-    assert row["handled"] is False
-    assert isinstance(row["clerk_note"], str)
-    assert row["clerk_note"].startswith("Clerk could not answer from your pages:")
+    assert result["outcome_kind"] == "sent_auto"
+    assert result["auto_reply_text"] == (
+        "I can help with the session fee, opening hours, and booking a day and time. "
+        "Tell me the day and time, or a person will reply."
+    )
+    open_ids = [row["id"] for row in client.get("/api/inbox", headers=owner_auth).json()]
+    assert inbound_id not in open_ids
 
 
 def test_mark_done_takes_it_off_the_list(client: TestClient, owner_auth: dict[str, str]) -> None:
@@ -90,13 +83,10 @@ def test_demo_desk_cannot_mark_done(client: TestClient, owner_auth: dict[str, st
     assert response.status_code == 403
 
 
-def test_a_later_draft_clears_the_note(client: TestClient, owner_auth: dict[str, str]) -> None:
-    body = "Please WhatsApp me the standard session fee."
+def test_a_booking_with_a_time_still_waits(client: TestClient, owner_auth: dict[str, str]) -> None:
+    body = "Please book me for Thursday at 10:00."
     inbound_id = _add_inbound(client, owner_auth, body)
-    _run_clerk(client, owner_auth, inbound_id, body, None)
-    assert _inbox_row(client, owner_auth, inbound_id)["clerk_note"] is not None
-
-    result = _run_clerk(client, owner_auth, inbound_id, body, "whatsapp_session_fee")
+    result = _run_clerk(client, owner_auth, inbound_id, body, "booking_thursday_10")
     assert result["queue_status"] == "pending"
     open_ids = [row["id"] for row in client.get("/api/inbox", headers=owner_auth).json()]
     assert inbound_id not in open_ids

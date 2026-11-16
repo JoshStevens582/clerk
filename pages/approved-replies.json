@@ -3,6 +3,10 @@
     {
       "id": "after_hours_ack",
       "text": "We got your message. We will reply on the next working day."
+    },
+    {
+      "id": "what_clerk_can_answer",
+      "text": "I can help with the session fee, opening hours, and booking a day and time. Tell me the day and time, or a person will reply."
     }
   ]
 }
