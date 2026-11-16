@@ -60,8 +60,12 @@ def test_invented_price_refused(policy: PolicyService) -> None:
         booking_time="10:00",
     )
     outcome = policy.apply(proposal)
-    assert outcome.kind == PolicyOutcomeKind.BLOCKED
+    assert outcome.kind == PolicyOutcomeKind.SENT_AUTO
     assert outcome.block_reason == "invented_price"
+    assert outcome.auto_reply_text == (
+        "I can help with the session fee, opening hours, and booking a day and time. "
+        "Tell me the day and time, or a person will reply."
+    )
 
 
 def test_leave_days_must_match_page(policy: PolicyService) -> None:
@@ -100,8 +104,10 @@ def test_whatsapp_invented_price_refused(policy: PolicyService) -> None:
         claimed_amounts=["R999"],
     )
     outcome = policy.apply(proposal)
-    assert outcome.kind == PolicyOutcomeKind.BLOCKED
+    assert outcome.kind == PolicyOutcomeKind.SENT_AUTO
     assert outcome.block_reason == "invented_price"
+    assert outcome.auto_reply_text is not None
+    assert "R999" not in outcome.auto_reply_text
 
 
 def test_invented_leave_days_refused(policy: PolicyService) -> None:
@@ -114,5 +120,7 @@ def test_invented_leave_days_refused(policy: PolicyService) -> None:
         claimed_day_counts=["10 days"],
     )
     outcome = policy.apply(proposal)
-    assert outcome.kind == PolicyOutcomeKind.BLOCKED
+    assert outcome.kind == PolicyOutcomeKind.SENT_AUTO
     assert outcome.block_reason == "invented_leave_days"
+    assert outcome.auto_reply_text is not None
+    assert "10 days" not in outcome.auto_reply_text

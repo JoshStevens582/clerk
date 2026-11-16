@@ -31,7 +31,7 @@ def test_channel_and_phone_edges() -> None:
             proposal_kind=ProposalKind.MISSING_FACT,
             inbound_channel="WhatsApp",
         )
-        == "email"
+            == "whatsapp"
     )
 
 

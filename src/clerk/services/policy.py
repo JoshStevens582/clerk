@@ -1,6 +1,8 @@
 from clerk.schemas.agent import AgentProposal, PolicyOutcome, PolicyOutcomeKind, ProposalKind
 from clerk.services.pages import PageStore
 
+BOUNDARY_REPLY_ID = "what_clerk_can_answer"
+
 
 class PolicyService:
     """Only this module may decide auto-send vs queue vs block."""
@@ -10,9 +12,9 @@ class PolicyService:
 
     def apply(self, proposal: AgentProposal) -> PolicyOutcome:
         if proposal.kind == ProposalKind.MISSING_FACT:
-            return PolicyOutcome(
-                kind=PolicyOutcomeKind.NEEDS_INFO,
-                message=proposal.missing_fact_message or "More information is required.",
+            return self._boundary_reply(
+                reason="missing_fact",
+                staff_message=proposal.missing_fact_message or "More information is required.",
             )
 
         if proposal.kind == ProposalKind.AUTO_REPLY:
@@ -55,16 +57,14 @@ class PolicyService:
 
     def _apply_draft(self, proposal: AgentProposal) -> PolicyOutcome:
         if not proposal.draft_body:
-            return PolicyOutcome(
-                kind=PolicyOutcomeKind.BLOCKED,
-                message="Draft body is empty.",
-                block_reason="empty_draft",
+            return self._boundary_reply(
+                reason="empty_draft",
+                staff_message="Draft body is empty.",
             )
         if not proposal.cited_pages:
-            return PolicyOutcome(
-                kind=PolicyOutcomeKind.BLOCKED,
-                message="Draft must cite at least one page.",
-                block_reason="missing_citation",
+            return self._boundary_reply(
+                reason="missing_citation",
+                staff_message="Draft must cite at least one page.",
             )
 
         page_bodies: dict[str, str] = {}
@@ -72,26 +72,23 @@ class PolicyService:
             try:
                 page_bodies[page_name] = self._pages.read_page(page_name)
             except FileNotFoundError:
-                return PolicyOutcome(
-                    kind=PolicyOutcomeKind.BLOCKED,
-                    message=f"Cited page not found: {page_name}",
-                    block_reason="missing_page",
+                return self._boundary_reply(
+                    reason="missing_page",
+                    staff_message=f"Cited page not found: {page_name}",
                 )
 
         for amount in proposal.claimed_amounts:
             if not any(amount in body for body in page_bodies.values()):
-                return PolicyOutcome(
-                    kind=PolicyOutcomeKind.BLOCKED,
-                    message=f"Price {amount} is not on the cited pages.",
-                    block_reason="invented_price",
+                return self._boundary_reply(
+                    reason="invented_price",
+                    staff_message=f"Price {amount} is not on the cited pages.",
                 )
 
         for day_count in proposal.claimed_day_counts:
             if not any(day_count in body for body in page_bodies.values()):
-                return PolicyOutcome(
-                    kind=PolicyOutcomeKind.BLOCKED,
-                    message=f"Leave amount {day_count} is not on the cited pages.",
-                    block_reason="invented_leave_days",
+                return self._boundary_reply(
+                    reason="invented_leave_days",
+                    staff_message=f"Leave amount {day_count} is not on the cited pages.",
                 )
 
         if proposal.kind == ProposalKind.WHATSAPP_DRAFT:
@@ -105,4 +102,20 @@ class PolicyService:
             draft_body=proposal.draft_body,
             cited_pages=list(proposal.cited_pages),
             slot_held=False,
+        )
+
+    def _boundary_reply(self, *, reason: str, staff_message: str) -> PolicyOutcome:
+        """Tell the client the exact stored limit. Do not invent an answer."""
+        reply = self._pages.load_approved_replies().by_id(BOUNDARY_REPLY_ID)
+        if reply is None:
+            return PolicyOutcome(
+                kind=PolicyOutcomeKind.BLOCKED,
+                message=staff_message,
+                block_reason=reason,
+            )
+        return PolicyOutcome(
+            kind=PolicyOutcomeKind.SENT_AUTO,
+            message=staff_message,
+            auto_reply_text=reply.text,
+            block_reason=reason,
         )

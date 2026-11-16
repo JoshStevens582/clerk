@@ -39,20 +39,23 @@ def normalize_phone(raw: str | None, *, strict: bool = True) -> str | None:
 
 
 def draft_kind_for_channel(kind: ProposalKind, inbound_channel: str | None) -> ProposalKind:
-    """A reply on WhatsApp is a WhatsApp draft, even if the model picked email."""
+    """Reply on the channel the message arrived on."""
     if kind == ProposalKind.EMAIL_DRAFT and is_whatsapp_channel(inbound_channel):
         return ProposalKind.WHATSAPP_DRAFT
+    if kind == ProposalKind.WHATSAPP_DRAFT and not is_whatsapp_channel(inbound_channel):
+        return ProposalKind.EMAIL_DRAFT
     return kind
 
 
 def outbound_channel_name(*, proposal_kind: ProposalKind, inbound_channel: str | None) -> str:
     """Stored on the task and outbox: 'email' or 'whatsapp'."""
-    if proposal_kind == ProposalKind.WHATSAPP_DRAFT:
+    if proposal_kind == ProposalKind.WHATSAPP_DRAFT and is_whatsapp_channel(inbound_channel):
         return "whatsapp"
     if is_whatsapp_channel(inbound_channel) and proposal_kind in {
         ProposalKind.AUTO_REPLY,
         ProposalKind.EMAIL_DRAFT,
         ProposalKind.BOOKING_DRAFT,
+        ProposalKind.MISSING_FACT,
     }:
         return "whatsapp"
     return "email"
