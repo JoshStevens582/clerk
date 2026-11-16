@@ -199,11 +199,10 @@ async def test_whatsapp_booking_without_a_draft_sends_the_stored_limit(
     )
     assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
     assert result.auto_reply_text == (
-        "Ask one of these and I will answer: What is the session fee? "
-        "What are your opening hours? What do you treat? "
-        "What documents do you need for a tax return? "
-        "To book, tell me the day and the time, for example Tuesday at 10. "
-        "A person replies to anything else."
+        "I can tell you the session fee, when we are open, and what we treat. "
+        "I can also tell you which documents a tax return needs. "
+        "To book, say which day and what time suits you. "
+        "Ask in your own words. A person replies to anything else."
     )
     with repaired._db_factory() as session:
         task = session.get(TaskRow, result.task_id)
@@ -229,7 +228,75 @@ async def test_available_times_sends_the_hours(workflow: ClerkWorkflow) -> None:
     assert "Monday to Friday" in result.auto_reply_text
     assert "close at 5:00 PM" in result.auto_reply_text
     assert "no list of open appointment times" in result.auto_reply_text
-    assert "Ask one of these" not in result.auto_reply_text
+    assert "Ask in your own words" not in result.auto_reply_text
+
+
+class _ShoulderDraftAgent:
+    async def interpret(
+        self,
+        text: str,
+        *,
+        sample_id: str | None = None,
+        channel: str | None = None,
+    ) -> ClerkRunResult:
+        del text, sample_id, channel
+        return ClerkRunResult(
+            kind=ProposalKind.WHATSAPP_DRAFT,
+            draft_body="We can help with that shoulder. I will write this in my own words.",
+            cited_pages=["services.md"],
+        )
+
+
+@pytest.mark.asyncio
+async def test_customers_can_ask_in_their_own_words(workflow: ClerkWorkflow) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _EmptyDraftAgent()  # type: ignore[assignment]
+    fee = await repaired.handle_message(
+        "How much do you charge for an appointment?",
+        reply_to_email="james@example.com",
+        channel="Email",
+    )
+    assert fee.auto_reply_text is not None
+    assert "R650" in fee.auto_reply_text
+    assert "Ask in your own words" not in fee.auto_reply_text
+
+    hours = await repaired.handle_message(
+        "Are you open on Saturday?",
+        reply_to_email="james@example.com",
+        channel="Email",
+    )
+    assert hours.auto_reply_text is not None
+    assert "Monday to Friday" in hours.auto_reply_text
+    assert "Saturday" in hours.auto_reply_text
+
+    sore = await repaired.handle_message(
+        "My shoulder has been sore for a week",
+        reply_to_email="james@example.com",
+        channel="WhatsApp",
+        phone="+27820000000",
+    )
+    assert sore.auto_reply_text is not None
+    assert "shoulder" in sore.auto_reply_text
+    assert "own words" not in sore.auto_reply_text
+
+
+@pytest.mark.asyncio
+async def test_a_draft_about_a_known_page_sends_the_stored_sentence(
+    workflow: ClerkWorkflow,
+) -> None:
+    repaired = ClerkWorkflow(workflow._agent, workflow._policy, workflow._db_factory)
+    repaired._agent = _ShoulderDraftAgent()  # type: ignore[assignment]
+    result = await repaired.handle_message(
+        "I need help with this",
+        reply_to_email="james@example.com",
+        channel="WhatsApp",
+        phone="+27820000000",
+    )
+    assert result.outcome_kind == PolicyOutcomeKind.SENT_AUTO
+    assert result.auto_reply_text is not None
+    assert "own words" not in result.auto_reply_text
+    assert "shoulder pain" in result.auto_reply_text
+    assert "I will write this in my own words." not in result.auto_reply_text
 
 
 @pytest.mark.asyncio

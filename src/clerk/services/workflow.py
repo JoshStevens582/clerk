@@ -23,13 +23,20 @@ _ANSWERED_OUTCOMES = {PolicyOutcomeKind.QUEUED, PolicyOutcomeKind.SENT_AUTO}
 
 _BOOKING_ASK = re.compile(r"\b(?:book|booking|appointment)\b", re.IGNORECASE)
 _APPROVED_QUESTIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("session_fee", re.compile(r"\b(?:fees?|costs?|prices?|how much)\b", re.IGNORECASE)),
+    (
+        "session_fee",
+        re.compile(
+            r"\b(?:fees?|costs?|prices?|how much|charg(?:e|es|ing)|tariffs?|payment)\b",
+            re.IGNORECASE,
+        ),
+    ),
     (
         "opening_hours",
         re.compile(
-            r"\b(?:opening hours|business hours|are you open|when are you open|"
-            r"when do you (?:open|close)|closing time|what times?|what days?|"
-            r"availability|times are available|days are available)\b",
+            r"\b(?:opening hours|business hours|are you open|are you closed|"
+            r"when are you open|when do you (?:open|close)|closing time|"
+            r"what times?|what days?|availability|available|saturdays?|sundays?|"
+            r"weekends?|public holidays?|open on)\b",
             re.IGNORECASE,
         ),
     ),
@@ -37,14 +44,22 @@ _APPROVED_QUESTIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "services_offered",
         re.compile(
             r"\b(?:what do you (?:treat|offer)|what services|services do you|"
-            r"do you treat|sports injury)\b",
+            r"do you treat|sports injur(?:y|ies)|physiotherapy|physio|needling|"
+            r"rehab(?:ilitation)?|(?:back|neck|shoulder) pain|shoulder|"
+            r"sore (?:back|neck|shoulder)|hurt my (?:back|neck|shoulder)|treatment)\b",
             re.IGNORECASE,
         ),
     ),
     (
         "tax_documents",
-        re.compile(r"\b(?:tax return|tax documents|irp5|it3)\b", re.IGNORECASE),
+        re.compile(r"\b(?:tax(?: return| documents)?|irp5|it3)\b", re.IGNORECASE),
     ),
+)
+_PAGE_REPLIES: tuple[tuple[str, str], ...] = (
+    ("fees.md", "session_fee"),
+    ("hours.md", "opening_hours"),
+    ("services.md", "services_offered"),
+    ("tax-return-documents.md", "tax_documents"),
 )
 _WEEKDAY = re.compile(
     r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
@@ -131,6 +146,17 @@ def _approved_question_ids(text: str) -> list[str]:
     return [reply_id for reply_id, pattern in _APPROVED_QUESTIONS if pattern.search(text)]
 
 
+def _replies_from_cited_pages(proposal: AgentProposal) -> list[str]:
+    """A draft that only cites known pages sends those stored answers."""
+    cited = {name.strip() for name in proposal.cited_pages}
+    if not cited:
+        return []
+    known = {page for page, _reply_id in _PAGE_REPLIES}
+    if not cited <= known:
+        return []
+    return [reply_id for page, reply_id in _PAGE_REPLIES if page in cited]
+
+
 def _stored_auto_reply(proposal: AgentProposal, reply_ids: list[str]) -> AgentProposal:
     """Send the exact stored sentences. The model does not write them."""
     return proposal.model_copy(
@@ -173,6 +199,10 @@ def _repair_incomplete_booking(
             return _stored_auto_reply(proposal, question_ids)
     if _asks_to_book(text):
         return _stored_auto_reply(proposal, ["what_clerk_can_answer"])
+    if answer_questions:
+        question_ids = _replies_from_cited_pages(proposal)
+        if question_ids:
+            return _stored_auto_reply(proposal, question_ids)
     return proposal
 
 

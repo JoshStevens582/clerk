@@ -44,11 +44,10 @@ def test_unanswered_message_sends_the_stored_limit(
     result = _run_clerk(client, owner_auth, inbound_id, body, None)
     assert result["outcome_kind"] == "sent_auto"
     assert result["auto_reply_text"] == (
-        "Ask one of these and I will answer: What is the session fee? "
-        "What are your opening hours? What do you treat? "
-        "What documents do you need for a tax return? "
-        "To book, tell me the day and the time, for example Tuesday at 10. "
-        "A person replies to anything else."
+        "I can tell you the session fee, when we are open, and what we treat. "
+        "I can also tell you which documents a tax return needs. "
+        "To book, say which day and what time suits you. "
+        "Ask in your own words. A person replies to anything else."
     )
     open_ids = [row["id"] for row in client.get("/api/inbox", headers=owner_auth).json()]
     assert inbound_id not in open_ids
