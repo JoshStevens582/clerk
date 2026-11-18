@@ -584,6 +584,27 @@ export async function resetDemoInbox(): Promise<string> {
   return parsed.message;
 }
 
+export async function askDemoClerk(payload: {
+  body: string;
+  channel: "Email" | "WhatsApp";
+}): Promise<InboxMessage> {
+  const row = await api<{
+    id: number;
+    from_name: string;
+    from_email: string;
+    subject: string;
+    body: string;
+    channel: string;
+    sample_id: string | null;
+    clerk_note?: string | null;
+    created_at: string;
+  }>("/api/inbox/demo-ask", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return mapInbound(row);
+}
+
 export async function createInboundMessage(payload: {
   from_name: string;
   from_email: string;

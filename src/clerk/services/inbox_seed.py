@@ -60,6 +60,13 @@ def demo_contact_emails() -> set[str]:
     }
 
 
+VISITOR_SAMPLE_PREFIX = "visitor-"
+
+
+def is_visitor_sample(sample_id: str | None) -> bool:
+    return bool(sample_id) and str(sample_id).startswith(VISITOR_SAMPLE_PREFIX)
+
+
 def is_demo_contact(email: str | None) -> bool:
     if not email or not email.strip():
         return False

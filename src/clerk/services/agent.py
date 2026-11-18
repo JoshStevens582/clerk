@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext
@@ -12,6 +13,8 @@ from clerk.services.pages import PageStore
 class AgentDeps:
     pages: PageStore
 
+
+logger = logging.getLogger("clerk.agent")
 
 SYSTEM_PROMPT = """You are Clerk, an automation agent for a small business.
 
@@ -58,7 +61,7 @@ def build_agent(settings: Settings, pages: PageStore) -> Agent[AgentDeps, ClerkR
     @agent.tool
     def read_page(ctx: RunContext[AgentDeps], page_name: str) -> str:
         """Read an approved markdown page by file name (for example fees.md)."""
-        return ctx.deps.pages.read_page(page_name)
+        return read_page_for_model(ctx.deps.pages, page_name)
 
     @agent.tool
     def list_pages(ctx: RunContext[AgentDeps]) -> list[str]:
@@ -66,6 +69,26 @@ def build_agent(settings: Settings, pages: PageStore) -> Agent[AgentDeps, ClerkR
         return ctx.deps.pages.list_markdown_pages()
 
     return agent
+
+
+def read_page_for_model(pages: PageStore, page_name: str) -> str:
+    """Return page text, or a correction when the model names a page that does not exist."""
+    try:
+        return pages.read_page(page_name)
+    except FileNotFoundError:
+        available = ", ".join(pages.list_markdown_pages()) or "none"
+        return (
+            f"No page named {page_name}. Approved pages: {available}. "
+            "If none of those pages answer the question, return kind=auto_reply "
+            "with auto_reply_id=what_clerk_can_answer."
+        )
+
+
+def _boundary_result() -> ClerkRunResult:
+    return ClerkRunResult(
+        kind=ProposalKind.AUTO_REPLY,
+        auto_reply_id="what_clerk_can_answer",
+    )
 
 
 class ClerkAgentService:
@@ -92,22 +115,26 @@ class ClerkAgentService:
         sample_id: str | None = None,
         channel: str | None = None,
     ) -> ClerkRunResult:
+        if self._agent is not None:
+            prompt = text
+            if channel and channel.strip().lower() == "whatsapp":
+                prompt = f"Inbound channel: WhatsApp.\n\n{text}"
+            deps = AgentDeps(pages=self._pages)
+            try:
+                run = await self._agent.run(prompt, deps=deps)
+            except Exception as exc:
+                logger.error("clerk model run failed error=%s", type(exc).__name__)
+                return _boundary_result()
+            return run.output
+
         if sample_id:
             sample = result_for_sample(sample_id)
             if sample is not None:
                 return sample
 
-        if self._agent is None:
-            return ClerkRunResult(
-                kind=ProposalKind.MISSING_FACT,
-                missing_fact_message=(
-                    "OpenAI is not configured. Use a demo sample or set OPENAI_API_KEY."
-                ),
-            )
-
-        prompt = text
-        if channel and channel.strip().lower() == "whatsapp":
-            prompt = f"Inbound channel: WhatsApp.\n\n{text}"
-        deps = AgentDeps(pages=self._pages)
-        run = await self._agent.run(prompt, deps=deps)
-        return run.output
+        return ClerkRunResult(
+            kind=ProposalKind.MISSING_FACT,
+            missing_fact_message=(
+                "OpenAI is not configured. Use a demo sample or set OPENAI_API_KEY."
+            ),
+        )

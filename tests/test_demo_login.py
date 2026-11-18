@@ -115,6 +115,53 @@ def test_demo_examples_stay_available_after_open(demo_client: TestClient) -> Non
     assert replacement["handled"] is False
 
 
+def test_demo_visitor_can_type_a_message(demo_client: TestClient) -> None:
+    owner = demo_client.post(
+        "/api/auth/login",
+        json={"username": "owner", "password": "test-pass-99"},
+    )
+    assert owner.status_code == 200
+    owner_headers = {"Authorization": f"Bearer {owner.json()['access_token']}"}
+
+    demo = demo_client.post("/api/auth/demo")
+    assert demo.status_code == 200
+    demo_headers = {"Authorization": f"Bearer {demo.json()['access_token']}"}
+
+    denied = demo_client.post(
+        "/api/inbox/demo-ask",
+        headers=owner_headers,
+        json={"body": "What is the session fee?", "channel": "Email"},
+    )
+    assert denied.status_code == 403
+
+    blank = demo_client.post(
+        "/api/inbox/demo-ask",
+        headers=demo_headers,
+        json={"body": "   ", "channel": "Email"},
+    )
+    assert blank.status_code == 422
+
+    created = demo_client.post(
+        "/api/inbox/demo-ask",
+        headers=demo_headers,
+        json={"body": "What is the session fee?", "channel": "WhatsApp"},
+    )
+    assert created.status_code == 200, created.text
+    row = created.json()
+    assert row["sample_id"].startswith("visitor-")
+    assert row["channel"] == "WhatsApp"
+    assert row["from_email"] == "demo+visitor@customchatandautomation.co.za"
+    assert row["body"] == "What is the session fee?"
+
+    demo_inbox = demo_client.get("/api/inbox", headers=demo_headers)
+    assert demo_inbox.status_code == 200
+    assert any(item["id"] == row["id"] for item in demo_inbox.json())
+
+    owner_inbox = demo_client.get("/api/inbox", headers=owner_headers)
+    assert owner_inbox.status_code == 200
+    assert all(item["id"] != row["id"] for item in owner_inbox.json())
+
+
 def test_clear_demo_mail_leaves_live_patient_mail(demo_client: TestClient) -> None:
     owner = demo_client.post(
         "/api/auth/login",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import {
+  askDemoClerk,
   createInboundMessage,
   resetDemoInbox,
   type ClientRecord,
@@ -143,6 +144,9 @@ export function ClerkWorkspace({
     phone: "",
   });
   const [inboundError, setInboundError] = useState<string | null>(null);
+  const [askBody, setAskBody] = useState("");
+  const [askChannel, setAskChannel] = useState<"Email" | "WhatsApp">("Email");
+  const [askError, setAskError] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("desk");
   const [sentCollapsed, setSentCollapsed] = useState(false);
 
@@ -151,6 +155,24 @@ export function ClerkWorkspace({
       setMobilePane("desk");
     }
   }, [selected]);
+
+  async function onSubmitDemoAsk(event: React.FormEvent) {
+    event.preventDefault();
+    const body = askBody.trim();
+    if (!body) {
+      setAskError("Type a message first.");
+      return;
+    }
+    setAskError(null);
+    try {
+      const message = await askDemoClerk({ body, channel: askChannel });
+      setAskBody("");
+      onInboxChanged();
+      onSelectInbox(message);
+    } catch (err) {
+      setAskError(err instanceof Error ? err.message : "Could not ask Clerk.");
+    }
+  }
 
   async function onSubmitInbound(event: React.FormEvent) {
     event.preventDefault();
@@ -320,7 +342,7 @@ export function ClerkWorkspace({
         <p className="section-label">{demoDesk ? "Examples" : "Inbox — not handled yet"}</p>
         <p className="muted-copy inbox-hint">
           {demoDesk
-            ? "Open any example. It stays in this list so you can try it again."
+            ? "Open an example, or type your own message. Clerk reads the pages and writes the draft."
             : "Messages leave this list once Clerk drafts or answers them. If Clerk cannot answer from your pages, the message stays here marked Needs you until you press Mark done."}
         </p>
         {demoDesk && onClearDemoMail ? (
@@ -529,6 +551,38 @@ export function ClerkWorkspace({
           )}
         </header>
 
+        {demoDesk ? (
+          <form className="inbound-form" onSubmit={(event) => void onSubmitDemoAsk(event)}>
+            <p className="section-label">Ask Clerk</p>
+            {askError ? <p className="error">{askError}</p> : null}
+            <label>
+              Your message
+              <textarea
+                required
+                rows={3}
+                value={askBody}
+                placeholder="Ask about fees, hours, or a booking"
+                onChange={(event) => setAskBody(event.target.value)}
+              />
+            </label>
+            <label>
+              Channel
+              <select
+                value={askChannel}
+                onChange={(event) =>
+                  setAskChannel(event.target.value === "WhatsApp" ? "WhatsApp" : "Email")
+                }
+              >
+                <option>Email</option>
+                <option>WhatsApp</option>
+              </select>
+            </label>
+            <button type="submit" className="send" disabled={busy || askBody.trim().length === 0}>
+              {busy ? "Clerk is reading the pages…" : "Draft a reply"}
+            </button>
+          </form>
+        ) : null}
+
         <div className="workspace-body">
           {!user.email && !demoDesk ? (
             <p className="error banner">
@@ -603,8 +657,8 @@ export function ClerkWorkspace({
               {demoDesk && inbox.length > 0 ? (
                 <>
                   <p>
-                    Click an example. Clerk drafts the reply on this desk. Press Approve to finish
-                    the practice. Nothing is emailed or sent on WhatsApp.
+                    Click an example, or type a message above. Clerk reads the pages and writes the
+                    draft. Press Approve to finish. Nothing is emailed or sent on WhatsApp.
                   </p>
                   <div className="stack">
                     {inbox.map((message) => (

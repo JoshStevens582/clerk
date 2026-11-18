@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -6,12 +8,14 @@ from clerk.repositories.inbound_repo import InboundRepository
 from clerk.repositories.models import InboundMessageRow
 from clerk.repositories.record_repo import RecordRepository
 from clerk.repositories.task_repo import TaskRepository
-from clerk.schemas.api import CreateInboundIn, InboundMessageOut
+from clerk.schemas.api import CreateInboundIn, DemoAskIn, InboundMessageOut
 from clerk.schemas.auth import MessageOut
 from clerk.services.demo_accounts import is_demo_staff
 from clerk.services.inbox_seed import (
+    VISITOR_SAMPLE_PREFIX,
     demo_contact_emails,
     ensure_demo_inbox_samples,
+    is_visitor_sample,
     ordered_demo_samples,
 )
 
@@ -43,9 +47,10 @@ async def list_inbox(request: Request, staff: StaffDep) -> list[InboundMessageOu
         ensure_demo_inbox_samples(db_factory)
     with db_factory() as session:
         repo = InboundRepository(session)
-        rows = repo.list_open_demo_samples() if demo_desk else repo.list_open()
         if demo_desk:
-            rows = ordered_demo_samples(rows)
+            rows = ordered_demo_samples(repo.list_open_demo_samples())
+        else:
+            rows = [row for row in repo.list_open() if not is_visitor_sample(row.sample_id)]
         return [_inbound_out(row) for row in rows]
 
 
@@ -70,6 +75,38 @@ async def create_inbound(
             body=payload.body,
             channel=payload.channel,
             phone=payload.phone,
+        )
+        session.commit()
+        session.refresh(row)
+        return _inbound_out(row)
+
+
+@router.post("/demo-ask", response_model=InboundMessageOut)
+async def demo_ask(
+    payload: DemoAskIn,
+    request: Request,
+    staff: StaffDep,
+) -> InboundMessageOut:
+    """Demo visitors type their own message. It stays on the demo desk and is not live mail."""
+    settings = request.app.state.settings
+    if not is_demo_staff(settings, staff.username):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the demo desk can ask Clerk this way.",
+        )
+    subject = payload.body.splitlines()[0][:80]
+    phone = "+27820000000" if payload.channel == "WhatsApp" else None
+    db_factory: sessionmaker[Session] = request.app.state.db_factory
+    with db_factory() as session:
+        row = InboundRepository(session).create(
+            from_name="Demo visitor",
+            from_email="demo+visitor@customchatandautomation.co.za",
+            subject=subject,
+            body=payload.body,
+            channel=payload.channel,
+            phone=phone,
+            sample_id=f"{VISITOR_SAMPLE_PREFIX}{uuid4().hex}",
+            source="demo",
         )
         session.commit()
         session.refresh(row)

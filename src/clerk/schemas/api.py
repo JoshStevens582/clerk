@@ -31,6 +31,27 @@ class InboundMessageOut(BaseModel):
     created_at: datetime
 
 
+class DemoAskIn(BaseModel):
+    body: str = Field(min_length=1, max_length=8000)
+    channel: str = Field(default="Email", max_length=32)
+
+    @field_validator("body")
+    @classmethod
+    def body_not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Message is empty.")
+        return cleaned
+
+    @field_validator("channel")
+    @classmethod
+    def demo_channel(cls, value: str) -> str:
+        shown = display_channel(value)
+        if shown not in {"Email", "WhatsApp"}:
+            raise ValueError("Choose Email or WhatsApp.")
+        return shown
+
+
 class CreateInboundIn(BaseModel):
     from_name: str = Field(min_length=1, max_length=128)
     from_email: str = Field(min_length=3, max_length=320)
